@@ -1,0 +1,104 @@
+*highlightedundo.txt*	Make the undo region apparent!
+						Last change:07-Nov-2017.
+
+Author  : machakann <https://github.com/machakann>
+License : NYSL license
+          Japanese <http://www.kmonos.net/nysl/>
+          English (Unofficial) <http://www.kmonos.net/nysl/index.en.html>
+
+Requirement:	Vim 7.4 or higher
+		|+reltime| feature
+		|+float| feature
+		|+timers| feature
+		|+job| feature (optional)
+		diff command <https://www.gnu.org/software/diffutils/>
+==============================================================================
+INDEX					*highlightedundo-index*
+
+INTRODUCTION				|highlightedundo-introduction|
+HIGHLIGHT GROUPS			|highlightedundo-highlight-groups|
+KNOWN ISSUES				|highlightedundo-known-issues|
+
+==============================================================================
+INTRODUCTION				*highlightedundo-introduction*
+
+*highlightedundo.vim* is a plugin to just highlight regions changed by |undo|
+commands. Define related mappings to use.
+>
+	nmap u     <Plug>(highlightedundo-undo)
+	nmap <C-r> <Plug>(highlightedundo-redo)
+	nmap U     <Plug>(highlightedundo-Undo)
+	nmap g-    <Plug>(highlightedundo-gminus)
+	nmap g+    <Plug>(highlightedundo-gplus)
+<
+					*g:highlightedundo#highlight_mode*
+If |g:highlightedundo#highlight_mode| is set as 0, |highlightedundo.vim| does
+not highlight.
+
+If |g:highlightedundo#highlight_mode| is set as 1, |highlightedundo.vim|
+highlights using the highlight group |hl-HighlightedundoChange|.
+
+If |g:highlightedundo#highlight_mode| is set as 2, |highlightedundo.vim|
+highlights in two steps using the highlight groups |hl-HighlightedundoDelete|
+and |hl-HighlightedundoAdd|.
+
+				*g:highlightedundo#highlight_duration_delete*
+				*g:highlightedundo#highlight_duration_add*
+User can optimize the highlighting duration of deleted and added texts by
+|g:highlightedundo#highlight_duration_delete| and
+|g:highlightedundo#highlight_duration_add| respectively. Assign a time in
+millisecond.
+
+==============================================================================
+HIGHLIGHT GROUPS			*highlightedundo-highlight-groups*
+
+If you want to change the highlighting color, re-define the following
+highlight group.
+
+HighlightedundoChange				*hl-HighlightedundoChange*
+	The highlight group is to define the highlight color for added text by
+	an undo command when |g:highlightedundo#highlight_mode| is 1.
+	It is linked to a highlight group |hl-DiffChange| in default.
+>
+	highlight link HighlightedChange DiffChange
+<
+	If you want to asign the color directly, then:
+>
+	highlight HighlightedundoChange ctermbg=237 guibg=#404040
+<
+	See |:highlight| help for more details.
+
+HighlightedundoDelete				*hl-HighlightedundoDelete*
+	The highlight group is to define the highlight color for deleted text
+	by an undo command when |g:highlightedundo#highlight_mode| is 2.
+	It is linked to a highlight group |hl-DiffDelete| in default.
+>
+	highlight link HighlightedDelete DiffDelete
+<
+	If you want to asign the color directly, then:
+>
+	highlight HighlightedundoDelete ctermbg=237 guibg=#404040
+<
+	See |:highlight| help for more details.
+
+HighlightedundoAdd				*hl-HighlightedundoAdd*
+	The highlight group is to define the highlight color for added text
+	by an undo command when |g:highlightedundo#highlight_mode| is 2.
+	It is linked to a highlight group |hl-DiffAdd| in default.
+>
+	highlight link HighlightedAdd DiffAdd
+<
+	If you want to asign the color directly, then:
+>
+	highlight HighlightedundoAdd ctermbg=237 guibg=#404040
+<
+	See |:highlight| help for more details.
+
+==============================================================================
+KNOWN ISSUES				*highlightedundo-known-issues*
+
+ - The highlighted texts are re-calculated from diff command output
+   automatically, but it would not be as expected always.
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:noet:
