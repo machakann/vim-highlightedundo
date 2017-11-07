@@ -283,7 +283,7 @@ function! s:splitchange(linenr, change, lcsindexes) abort "{{{
   endif
   if empty(a:lcsindexes) || strchars(a:change[0]) == len(a:lcsindexes)
     let head = [0, a:linenr, a:change[1] + 1, 0]
-    let tail = [0, a:linenr, a:change[2] + 1, 0]
+    let tail = [0, a:linenr, a:change[2], 0]
     let subdiff = s:Subdiff(head, tail, 'v', [a:change[0]])
     return [subdiff]
   endif
