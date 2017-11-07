@@ -2,7 +2,7 @@
 Make the undo region apparent!
 
 ## Dependency
-`diff` command <https://www.gnu.org/software/diffutils/> is required to use this plugin.
+`diff` command (https://www.gnu.org/software/diffutils/) is required to use this plugin.
 
 ```vim
 " should be 1
