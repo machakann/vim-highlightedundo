@@ -255,12 +255,12 @@ function! s:highlight_order_charwise(region) abort  "{{{
   let n = 0
   if a:region.head != s:null_pos && a:region.tail != s:null_pos && s:is_equal_or_ahead(a:region.tail, a:region.head)
     if a:region.head[1] == a:region.tail[1]
-      let order += [a:region.head[1:2] + [a:region.tail[2] - a:region.head[2]]]
+      let order += [a:region.head[1:2] + [a:region.tail[2] - a:region.head[2] + 1]]
       let n += 1
     else
       for lnum in range(a:region.head[1], a:region.tail[1])
         if lnum == a:region.head[1]
-          let order += [a:region.head[1:2] + [col([a:region.head[1], '$']) - a:region.head[2]]]
+          let order += [a:region.head[1:2] + [col([a:region.head[1], '$']) - a:region.head[2] + 1]]
         elseif lnum == a:region.tail[1]
           let order += [[a:region.tail[1], 1] + [a:region.tail[2]]]
         else

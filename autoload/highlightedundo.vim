@@ -317,7 +317,7 @@ function! s:splitchange(linenr, change, lcsindexes) abort "{{{
   endfor
   let n = len(columns)
   if n == 0
-    let columns = [i, i]
+    " probably not possible
   elseif n == 1
     if columns[-1] + 1 == i
       call add(columns, i)
@@ -327,9 +327,6 @@ function! s:splitchange(linenr, change, lcsindexes) abort "{{{
   else
     if columns[-1] + 1 == i
       let columns[-1] = i
-    else
-      call add(changes, columns)
-      let columns = [i, i]
     endif
   endif
   call add(changes, columns)
