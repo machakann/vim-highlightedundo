@@ -7,6 +7,7 @@ let g:highlightedundo#highlight_duration_add = get(g:, 'highlightedundo#highligh
 
 let s:TEMPBEFORE = ''
 let s:TEMPAFTER = ''
+let s:GUI_RUNNING = has('gui_running')
 
 function! highlightedundo#undo() abort "{{{
   let [n, _] = s:undoablecount()
@@ -41,10 +42,33 @@ function! s:common(count, command, countercommand) abort "{{{
   let difflist = s:parsediff(diffoutput)
   call winrestview(view)
 
-  call highlightedundo#highlight#cancel()
-  call s:blink(difflist, g:highlightedundo#highlight_duration_delete)
-  execute "silent normal! " . a:count . a:command
-  call s:glow(difflist, g:highlightedundo#highlight_duration_add)
+  let originalcursor = s:hidecursor()
+  try
+    call highlightedundo#highlight#cancel()
+    call s:blink(difflist, g:highlightedundo#highlight_duration_delete)
+    execute "silent normal! " . a:count . a:command
+    call s:glow(difflist, g:highlightedundo#highlight_duration_add)
+  finally
+    call s:restorecursor(originalcursor)
+  endtry
+endfunction "}}}
+function! s:hidecursor() abort "{{{
+  if s:GUI_RUNNING
+    let cursor = &guicursor
+    set guicursor+=n-o:block-NONE
+  else
+    let cursor = &t_ve
+    set t_ve=
+  endif
+  return cursor
+endfunction "}}}
+function! s:restorecursor(originalcursor) abort "{{{
+  if s:GUI_RUNNING
+    set guicursor&
+    let &guicursor = a:originalcursor
+  else
+    let &t_ve = a:originalcursor
+  endif
 endfunction "}}}
 
 " for debug
