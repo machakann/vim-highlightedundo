@@ -510,7 +510,6 @@ function! s:glow(difflist, duration) abort "{{{
       call h.quench_timer(a:duration)
     endfor
   endfor
-  redraw
 endfunction "}}}
 
 " solving Longest Common Subsequence problem
