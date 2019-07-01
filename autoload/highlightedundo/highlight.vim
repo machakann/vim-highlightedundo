@@ -90,7 +90,6 @@ function! s:highlight.show(...) dict abort "{{{
   let self.group = hi_group
   let self.bufnr = bufnr('%')
   let self.winid = s:win_getid()
-  let self.text  = s:get_buf_text(self.region)
   return 1
 endfunction "}}}
 function! s:highlight.quench() dict abort "{{{
@@ -142,9 +141,6 @@ function! s:highlight.persist() dict abort  "{{{
   call s:set_autocmds(id)
   let s:quench_table[id] = self
   return id
-endfunction "}}}
-function! s:highlight.is_text_identical() dict abort "{{{
-  return s:get_buf_text(self.region) ==# self.text
 endfunction "}}}
 
 " for scheduled-quench "{{{
@@ -403,36 +399,6 @@ function! s:restore_options(options) abort "{{{
   else
     let &t_ve = a:options.cursor
   endif
-endfunction "}}}
-function! s:get_buf_text(region) abort  "{{{
-  " NOTE: Do *not* use operator+textobject in another textobject!
-  "       For example, getting a text with the command is not appropriate.
-  "         execute printf('normal! %s:call setpos(".", %s)%s""y', a:type, string(a:region.tail), "\<CR>")
-  "       Because it causes confusions for the unit of dot-repeating.
-  "       Use visual selection+operator as following.
-  let text = ''
-  let visual = [getpos("'<"), getpos("'>")]
-  let modified = [getpos("'["), getpos("']")]
-  let view = winsaveview()
-  let registers = s:saveregisters()
-  try
-    call setpos('.', a:region.head)
-    execute 'normal! ' . s:v(a:region.wise)
-    call setpos('.', a:region.tail)
-    silent noautocmd normal! ""y
-    let text = @@
-
-    " NOTE: This line is required to reset v:register.
-    normal! :
-  finally
-    call s:restoreregisters(registers)
-    call setpos("'<", visual[0])
-    call setpos("'>", visual[1])
-    call setpos("'[", modified[0])
-    call setpos("']", modified[1])
-    call winrestview(view)
-    return text
-  endtry
 endfunction "}}}
 function! s:saveregisters() abort "{{{
   let registers = {}
