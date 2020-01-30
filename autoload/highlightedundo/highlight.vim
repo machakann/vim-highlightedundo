@@ -100,8 +100,7 @@ function! s:highlight.quench() dict abort "{{{
   let winid = s:win_getid()
   let view = winsaveview()
   if s:win_getid() == self.winid
-    call map(self.id, 'matchdelete(v:val)')
-    call filter(self.id, 'v:val > 0')
+    call s:matchdelete_all(self.id)
     let succeeded = 1
   else
     if s:is_in_cmdline_window()
@@ -114,8 +113,7 @@ function! s:highlight.quench() dict abort "{{{
     else
       let reached = s:win_gotoid(self.winid)
       if reached
-        call map(self.id, 'matchdelete(v:val)')
-        call filter(self.id, 'v:val > 0')
+        call s:matchdelete_all(self.id)
       else
         call filter(self.id, 0)
       endif
@@ -355,6 +353,29 @@ else
   endfunction
 endif
 "}}}
+function! s:matchdelete_all(ids) abort "{{{
+  if empty(a:ids)
+    return
+  endif
+
+  let alive_ids = map(getmatches(), 'v:val.id')
+  if empty(alive_ids)
+    return
+  endif
+  " Return if another plugin called clearmatches() which clears *ALL*
+  " highlights including others set.
+  if !count(alive_ids, a:ids[0])
+    return
+  endif
+
+  for id in a:ids
+    try
+      call matchdelete(id)
+    catch
+    endtry
+  endfor
+  call filter(a:ids, 0)
+endfunction "}}}
 function! s:is_equal_or_ahead(pos1, pos2) abort  "{{{
   return a:pos1[1] > a:pos2[1] || (a:pos1[1] == a:pos2[1] && a:pos1[2] >= a:pos2[2])
 endfunction "}}}
