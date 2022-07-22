@@ -121,7 +121,8 @@ function! s:Diff(kind, from, to, lines) abort
   elseif a:kind ==# 'c'
     let fromlinenrlist = range(a:from[0], a:from[1])
     let tolinenrlist = range(a:to[0], a:to[1])
-    for i in range(max([len(fromlinenrlist), len(tolinenrlist)]))
+    " XXX: To make it faster, restrict max 100 diff changes.
+    for i in range(min([max([len(fromlinenrlist), len(tolinenrlist)]), 100]))
       if i < len(fromlinenrlist) && i < len(tolinenrlist)
         let before = a:lines.delete[i]
         let after = a:lines.add[i]
