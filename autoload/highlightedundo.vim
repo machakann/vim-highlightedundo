@@ -271,7 +271,10 @@ function! s:get_seq_of_curhead_parent(undotree) abort "{{{
   return -1
 endfunction "}}}
 function! s:getchanged(before, after) abort "{{{
-  if empty(a:before) || empty(a:after)
+  " XXX: Check matching strictly upto this char length (for performance reason)
+  let matchlen = 200
+
+  if empty(a:before) || empty(a:after) || len(a:before) > matchlen || len(a:after) > matchlen
     let changedbefore = [a:before, 0, strlen(a:before)]
     let changedafter = [a:after, 0, strlen(a:after)]
     return [changedbefore, changedafter]
