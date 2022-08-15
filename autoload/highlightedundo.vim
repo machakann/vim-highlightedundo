@@ -414,14 +414,15 @@ function! s:parsechunk(diffoutput, from, to, i, n) abort "{{{
       break
     endif
 
-    let [addedline, pos, _] = matchstrpos(line, '\m^>\s\zs.*')
+    " XXX: For performance, check only up to 250 chars.
+    let [addedline, pos, _] = matchstrpos(line, '\m^>\s\zs.\{,250}')
     if pos != -1
       call add(lines.add, addedline)
       let i += 1
       continue
     endif
 
-    let [deletedline, pos, _] = matchstrpos(line, '\m^<\s\zs.*')
+    let [deletedline, pos, _] = matchstrpos(line, '\m^<\s\zs.\{,250}')
     if pos != -1
       call add(lines.delete, deletedline)
       let i += 1
