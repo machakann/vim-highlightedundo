@@ -37,19 +37,23 @@ function! s:common(count, command, countercommand) abort "{{{
     return
   endif
 
-  let view = winsaveview()
-  let diffoutput = s:getdiff(a:count, a:command, a:countercommand)
-  let difflist = s:parsediff(diffoutput)
-  call winrestview(view)
-
-  let originalcursor = s:hidecursor()
   try
-    call highlightedundo#highlight#cancel()
-    call s:blink(difflist, g:highlightedundo#highlight_duration_delete)
+    let view = winsaveview()
+    let diffoutput = s:getdiff(a:count, a:command, a:countercommand)
+    let difflist = s:parsediff(diffoutput)
+    call winrestview(view)
+
+    let originalcursor = s:hidecursor()
+    try
+      call highlightedundo#highlight#cancel()
+      call s:blink(difflist, g:highlightedundo#highlight_duration_delete)
+      execute "silent normal! " . a:count . a:command
+      call s:glow(difflist, g:highlightedundo#highlight_duration_add)
+    finally
+      call s:restorecursor(originalcursor)
+    endtry
+  catch
     execute "silent normal! " . a:count . a:command
-    call s:glow(difflist, g:highlightedundo#highlight_duration_add)
-  finally
-    call s:restorecursor(originalcursor)
   endtry
 endfunction "}}}
 function! s:hidecursor() abort "{{{
