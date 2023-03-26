@@ -73,50 +73,63 @@ function! s:suite.undo_redo() abort "{{{
   execute "normal 2\<C-r>"
   call g:assert.equals(getline('.'), 'foobaz', '#17')
 endfunction "}}}
-" function! s:suite.gplus_gminus() abort "{{{
-"   normal! Afoo
-"   normal! Abar
-"   normal! u
-"   normal! Abaz
+function! s:suite.gplus_gminus() abort "{{{
+  normal! Afoo
+  normal! Abar
+  normal! u
+  normal! Abaz
 
-"   normal g-
-"   call g:assert.equals(getline('.'), 'foobar', '#1')
+  normal g-
+  call g:assert.equals(getline('.'), 'foobar', '#1')
 
-"   normal g-
-"   call g:assert.equals(getline('.'), 'foo', '#2')
+  normal g-
+  call g:assert.equals(getline('.'), 'foo', '#2')
 
-"   normal g-
-"   call g:assert.equals(getline('.'), '', '#3')
+  normal g-
+  call g:assert.equals(getline('.'), '', '#3')
 
-"   normal g+
-"   call g:assert.equals(getline('.'), 'foo', '#4')
+  normal g+
+  call g:assert.equals(getline('.'), 'foo', '#4')
 
-"   normal g+
-"   call g:assert.equals(getline('.'), 'foobar', '#5')
+  normal g+
+  call g:assert.equals(getline('.'), 'foobar', '#5')
 
-"   normal g+
-"   call g:assert.equals(getline('.'), 'foobaz', '#6')
+  normal g+
+  call g:assert.equals(getline('.'), 'foobaz', '#6')
 
-"   normal 3g-
-"   call g:assert.equals(getline('.'), '', '#7')
+  normal 3g-
+  call g:assert.equals(getline('.'), '', '#7')
 
-"   normal 3g+
-"   call g:assert.equals(getline('.'), 'foobaz', '#8')
+  normal 3g+
+  call g:assert.equals(getline('.'), 'foobaz', '#8')
 
-"   normal 2g-
-"   call g:assert.equals(getline('.'), 'foo', '#9')
+  normal 2g-
+  call g:assert.equals(getline('.'), 'foo', '#9')
 
-"   normal! g-
-"   normal 2g+
-"   call g:assert.equals(getline('.'), 'foobar', '#10')
+  normal! g-
+  normal 2g+
+  call g:assert.equals(getline('.'), 'foobar', '#10')
 
-"   normal! g+
-"   normal 4g-
-"   call g:assert.equals(getline('.'), '', '#11')
+  normal! g+
+  normal 4g-
+  call g:assert.equals(getline('.'), '', '#11')
 
-"   normal 4g+
-"   call g:assert.equals(getline('.'), 'foobaz', '#12')
-" endfunction "}}}
+  normal 4g+
+  call g:assert.equals(getline('.'), 'foobaz', '#12')
+endfunction "}}}
+function! s:suite.reset_undolebels() abort "{{{
+  normal! Afoo
+  let old_undolevels = &undolevels
+  set undolevels=-1
+  exe "normal a \<BS>\<Esc>"
+  let &undolevels = old_undolevels
+  " undotree().entries should be empty now
+  normal u
+  call g:assert.equals(getline('.'), 'foo', '#1')
+
+  execute "normal \<C-r>"
+  call g:assert.equals(getline('.'), 'foo', '#2')
+endfunction "}}}
 
 " vim:set foldmethod=marker:
 " vim:set commentstring="%s:

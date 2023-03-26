@@ -196,6 +196,9 @@ endif
 "}}}
 function! s:undoablecount() abort "{{{
   let undotree = undotree()
+  if undotree.entries == []
+    return [0, 0]
+  endif
   if undotree.seq_cur == 0
     let undocount = 0
     let redocount = len(undotree.entries)
