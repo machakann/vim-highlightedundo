@@ -249,6 +249,9 @@ function! s:undoablecount() abort "{{{
   return [undocount, redocount]
 endfunction "}}}
 function! s:get_seq_of_curhead_parent(undotree) abort "{{{
+  if a:undotree.entries == []
+    return -1
+  endif
   let stack = []
   let parttree = {}
   let parttree.pos = [0]
