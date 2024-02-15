@@ -129,7 +129,14 @@ function! s:highlight.quench() dict abort "{{{
   return succeeded
 endfunction "}}}
 function! s:highlight.quench_timer(time) dict abort "{{{
+  if g:highlightedundo#fast_mode && get(s:, 'timer_id', -1) >= 0
+      return s:timer_id
+  endif
+
   let id = timer_start(a:time, s:SID . 'quench')
+  if g:highlightedundo#fast_mode
+    let s:timer_id = id
+  endif
   let s:quench_table[id] = self
   call s:set_autocmds(id)
   return id
@@ -146,11 +153,10 @@ let s:quench_table = {}
 function! s:quench(id) abort  "{{{
   if g:highlightedundo#fast_mode
     call setmatches(filter(getmatches(), 'v:val.group !~# ''^Highlightedundo\(Add\|Change\|Delete\)$'''))
-    let l:id = v:null
-    for l:id in map(keys(s:quench_table), 'str2nr(v:val)')
-      call timer_stop(l:id)
-    endfor
-    unlet! l:id
+    if get(s:, 'timer_id', -1) >= 0
+      call timer_stop(s:timer_id)
+      unlet! s:timer_id
+    endif
     let s:quench_table = {}
   else
     return s:quench_(a:id)
