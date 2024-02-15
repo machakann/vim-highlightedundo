@@ -4,6 +4,7 @@ set cpoptions&vim
 let g:highlightedundo#highlight_mode = get(g:, 'highlightedundo#highlight_mode', 1)
 let g:highlightedundo#highlight_duration_delete = get(g:, 'highlightedundo#highlight_duration_delete', 200)
 let g:highlightedundo#highlight_duration_add = get(g:, 'highlightedundo#highlight_duration_add', 500)
+let g:highlightedundo#fast_mode = get(g:, 'highlightedundo#fast_mode', v:true)
 
 let s:TEMPBEFORE = ''
 let s:TEMPAFTER = ''

@@ -144,6 +144,19 @@ endfunction "}}}
 " for scheduled-quench "{{{
 let s:quench_table = {}
 function! s:quench(id) abort  "{{{
+  if g:highlightedundo#fast_mode
+    call setmatches(filter(getmatches(), 'v:val.group !~# ''^Highlightedundo\(Add\|Change\|Delete\)$'''))
+    let l:id = v:null
+    for l:id in map(keys(s:quench_table), 'str2nr(v:val)')
+      call timer_stop(l:id)
+    endfor
+    unlet! l:id
+    let s:quench_table = {}
+  else
+    return s:quench_(a:id)
+  endif
+endfunction "}}}
+function! s:quench_(id) abort  "{{{
   let options = s:shift_options()
   let highlight = s:get(a:id)
   try
@@ -157,7 +170,7 @@ function! s:quench(id) abort  "{{{
     endif
     return 1
   finally
-    unlet s:quench_table[a:id]
+    unlet! s:quench_table[a:id]
     call timer_stop(a:id)
     call s:restore_options(options)
     redraw
