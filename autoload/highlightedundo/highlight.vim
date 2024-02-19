@@ -150,6 +150,14 @@ endfunction "}}}
 
 " for scheduled-quench "{{{
 let s:quench_table = {}
+
+if g:highlightedundo#fast_mode
+  augroup highlightedundo-clear-highlight
+    autocmd!
+    autocmd WinLeave * call s:quench(-1)
+  augroup END
+endif
+
 function! s:quench(id) abort  "{{{
   if g:highlightedundo#fast_mode
     call setmatches(filter(getmatches(), 'v:val.group !~# ''^Highlightedundo\(Add\|Change\|Delete\)$'''))
