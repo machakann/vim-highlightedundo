@@ -535,17 +535,18 @@ function! s:glow(difflist, duration) abort "{{{
     return
   endif
 
+  let h = highlightedundo#highlight#new()
   let higroup = g:highlightedundo#highlight_mode == 1 ? 'HighlightedundoChange' : 'HighlightedundoAdd'
   for diff in a:difflist
     for subdiff in diff.add
       if filter(copy(subdiff.lines), '!empty(v:val)') == []
         continue
       endif
-      let h = highlightedundo#highlight#new(subdiff.region)
-      call h.show(higroup)
-      call h.quench_timer(a:duration)
+      call h.add(subdiff.region)
     endfor
   endfor
+  call h.show(higroup)
+  call h.quench_timer(a:duration)
 endfunction "}}}
 
 " solving Longest Common Subsequence problem
