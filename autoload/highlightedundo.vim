@@ -503,28 +503,22 @@ function! s:blink(difflist, duration) abort "{{{
     return
   endif
 
-  let highlightlist = []
+  let h = highlightedundo#highlight#new()
   for diff in a:difflist
     for subdiff in diff.delete
       if filter(copy(subdiff.lines), '!empty(v:val)') == []
         continue
       endif
-      let h = highlightedundo#highlight#new(subdiff.region)
-      call h.show('HighlightedundoDelete')
-      call add(highlightlist, h)
+      call h.add(subdiff.region)
     endfor
   endfor
-  if empty(highlightlist)
-    return
-  endif
-
+  call h.show('HighlightedundoDelete')
   redraw
+
   try
     call s:waitforinput(a:duration)
   finally
-    for h in highlightlist
-      call h.quench()
-    endfor
+    call h.quench()
   endtry
 endfunction "}}}
 function! s:glow(difflist, duration) abort "{{{
