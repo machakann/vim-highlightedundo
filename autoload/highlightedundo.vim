@@ -9,6 +9,8 @@ let s:TEMPBEFORE = ''
 let s:TEMPAFTER = ''
 let s:GUI_RUNNING = has('gui_running')
 
+let s:highlights = []
+
 function! highlightedundo#undo() abort "{{{
   let [n, _] = s:undoablecount()
   let safecount = min([v:count1, n])
@@ -50,7 +52,7 @@ function! s:common(count, command, countercommand) abort "{{{
 
   let originalcursor = s:hidecursor()
   try
-    call highlightedundo#highlight#cancel()
+    call s:quench_highlight()
     call s:blink(difflist, g:highlightedundo#highlight_duration_delete)
     execute "silent normal! " . a:count . a:command
     call s:glow(difflist, g:highlightedundo#highlight_duration_add)
@@ -495,6 +497,12 @@ function! s:waitforinput(duration) abort "{{{
   endwhile
   call clock.stop()
 endfunction "}}}
+function! s:quench_highlight() abort "{{{
+  for h in s:highlights
+    call h.quench()
+  endfor
+  call filter(s:highlights, 0)
+endfunction "}}}
 function! s:blink(difflist, duration) abort "{{{
   if a:duration <= 0
     return
@@ -547,6 +555,7 @@ function! s:glow(difflist, duration) abort "{{{
   endfor
   call h.show(higroup)
   call h.quench_timer(a:duration)
+  call add(s:highlights, h)
 endfunction "}}}
 
 " solving Longest Common Subsequence problem

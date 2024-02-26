@@ -39,6 +39,7 @@ function! highlightedundo#highlight#new() abort  "{{{
   return deepcopy(s:highlight)
 endfunction "}}}
 
+let s:quench_table = {}
 " s:highlight "{{{
 let s:highlight = {
       \   'status': s:off,
@@ -48,6 +49,7 @@ let s:highlight = {
       \   'region': {},
       \   'bufnr': 0,
       \   'winid': 0,
+      \   'timer_id': 0,
       \ }
 "}}}
 function! s:highlight.add(region) abort "{{{
@@ -56,8 +58,6 @@ function! s:highlight.add(region) abort "{{{
     let self.order_list += s:highlight_order_charwise(a:region)
   elseif a:region.wise ==# 'line' || a:region.wise ==# 'V'
     let self.order_list += s:highlight_order_linewise(a:region)
-  elseif a:region.wise ==# 'block' || a:region.wise[0] ==# "\<C-v>"
-    let self.order_list += s:highlight_order_blockwise(a:region)
   endif
 endfunction "}}}
 function! s:highlight.show(...) dict abort "{{{
@@ -93,9 +93,23 @@ function! s:highlight.show(...) dict abort "{{{
   let self.winid = s:win_getid()
   return 1
 endfunction "}}}
-function! s:highlight.quench() dict abort "{{{
+function! s:highlight.quench(...) dict abort "{{{
+  let options = s:shift_options()
+  try
+    call self._quench()
+  catch /^Vim\%((\a\+)\)\=:E523/
+    " NOTE: In case of "textlock"ed!
+    call self.quench_timer(50)
+  finally
+    call s:restore_options(options)
+  endtry
+  call timer_stop(self.timer_id)
+  call s:clear_autocmds()
+  redraw
+endfunction "}}}
+function! s:highlight._quench() abort "{{{
   if self.status is s:off
-    return 0
+    return
   endif
 
   let winid = s:win_getid()
@@ -105,10 +119,9 @@ function! s:highlight.quench() dict abort "{{{
     let succeeded = 1
   else
     if s:is_in_cmdline_window()
-      let s:paused += [self]
       augroup highlightedundo-pause-quenching
         autocmd!
-        autocmd CmdWinLeave * call s:got_out_of_cmdwindow()
+        execute printf("autocmd CmdWinLeave * call s:after_CmdWinLeave(%d)", self.timer_id)
       augroup END
       let succeeded = 0
     else
@@ -127,85 +140,29 @@ function! s:highlight.quench() dict abort "{{{
   if succeeded
     let self.status = s:off
   endif
-  return succeeded
+  return
 endfunction "}}}
 function! s:highlight.quench_timer(time) dict abort "{{{
-  let id = timer_start(a:time, s:SID . 'quench')
+  let id = timer_start(a:time, self.quench)
   let s:quench_table[id] = self
+  let self.timer_id = id
   call s:set_autocmds(id)
   return id
 endfunction "}}}
-function! s:highlight.persist() dict abort  "{{{
-  let id = s:get_pid()
-  call s:set_autocmds(id)
-  let s:quench_table[id] = self
-  return id
-endfunction "}}}
-
-" for scheduled-quench "{{{
-let s:quench_table = {}
-function! s:quench(id) abort  "{{{
-  let options = s:shift_options()
-  let highlight = s:get(a:id)
-  try
-    if highlight != {}
-      call highlight.quench()
-    endif
-  catch /^Vim\%((\a\+)\)\=:E523/
-    " NOTE: TextYankPost event sets "textlock"
-    if highlight != {}
-      call highlight.quench_timer(50)
-    endif
-    return 1
-  finally
-    unlet s:quench_table[a:id]
-    call timer_stop(a:id)
-    call s:restore_options(options)
-    redraw
-  endtry
-  call s:clear_autocmds()
-endfunction "}}}
-function! highlightedundo#highlight#cancel(...) abort "{{{
-  if a:0 > 0
-    let id_list = type(a:1) == s:type_list ? a:1 : a:000
-  else
-    let id_list = map(keys(s:quench_table), 'str2nr(v:val)')
-  endif
-
-  for id in id_list
-    call s:quench(id)
-  endfor
-endfunction "}}}
-function! s:get(id) abort "{{{
-  return get(s:quench_table, a:id, {})
-endfunction "}}}
-let s:paused = []
-function! s:quench_paused(...) abort "{{{
-  if s:is_in_cmdline_window()
-    return
-  endif
-
-  for highlight in s:paused
-    call highlight.quench()
-  endfor
-  let s:paused = []
+function! s:after_CmdWinLeave(id) abort "{{{
   augroup highlightedundo-pause-quenching
     autocmd!
   augroup END
+  let highlight = s:quench_table[a:id]
+  call remove(s:quench_table, a:id)
+  call highlight.quench_timer(0)
 endfunction "}}}
-function! s:got_out_of_cmdwindow() abort "{{{
-  augroup highlightedundo-pause-quenching
-    autocmd!
-    autocmd CursorMoved * call s:quench_paused()
-  augroup END
-endfunction "}}}
-
 function! s:set_autocmds(id) abort "{{{
   augroup highlightedundo-highlight
     autocmd!
-    " execute printf('autocmd TextChanged <buffer> call s:cancel_highlight(%s, "TextChanged")', a:id)
-    execute printf('autocmd InsertEnter <buffer> call s:cancel_highlight(%s, "InsertEnter")', a:id)
-    execute printf('autocmd BufUnload <buffer> call s:cancel_highlight(%s, "BufUnload")', a:id)
+    " execute printf('autocmd TextChanged <buffer> call s:cancel_highlight(%s)', a:id)
+    execute printf('autocmd InsertEnter <buffer> call s:cancel_highlight(%s)', a:id)
+    execute printf('autocmd BufUnload <buffer> call s:cancel_highlight(%s)', a:id)
     execute printf('autocmd BufEnter * call s:switch_highlight(%s)', a:id)
   augroup END
 endfunction "}}}
@@ -214,14 +171,14 @@ function! s:clear_autocmds() abort "{{{
     autocmd!
   augroup END
 endfunction "}}}
-function! s:cancel_highlight(id, event) abort  "{{{
-  let highlight = s:get(a:id)
+function! s:cancel_highlight(id) abort  "{{{
+  let highlight = s:quench_table[a:id]
   if highlight != {}
-    call s:quench(a:id)
+    call highlight.quench()
   endif
 endfunction "}}}
 function! s:switch_highlight(id) abort "{{{
-  let highlight = s:get(a:id)
+  let highlight = s:quench_table[a:id]
   if highlight != {} && highlight.winid == s:win_getid()
     if highlight.bufnr == bufnr('%')
       call highlight.show()
@@ -230,7 +187,7 @@ function! s:switch_highlight(id) abort "{{{
     endif
   endif
 endfunction "}}}
-"}}}
+
 
 " private functions
 function! s:highlight_order_charwise(region) abort  "{{{
@@ -285,43 +242,6 @@ function! s:highlight_order_linewise(region) abort  "{{{
   if order != []
     let order_list += [order]
   endif
-  return order_list
-endfunction "}}}
-function! s:highlight_order_blockwise(region) abort "{{{
-  let view = winsaveview()
-  let vcol_head = virtcol(a:region.head[1:2])
-  if a:region.blockwidth == s:maxcol
-    let vcol_tail = a:region.blockwidth
-  else
-    let vcol_tail = vcol_head + a:region.blockwidth - 1
-  endif
-  let order = []
-  let order_list = []
-  let n = 0
-  if a:region.head != s:null_pos && a:region.tail != s:null_pos && s:is_equal_or_ahead(a:region.tail, a:region.head)
-    for lnum in range(a:region.head[1], a:region.tail[1])
-      call cursor(lnum, 1)
-      execute printf('normal! %s|', vcol_head)
-      let head = getpos('.')
-      execute printf('normal! %s|', vcol_tail)
-      let tail = getpos('.')
-      let col = head[2]
-      let len = tail[2] - head[2] + 1
-      let order += [[lnum, col, len]]
-
-      if n == 7
-        let order_list += [order]
-        let order = []
-        let n = 0
-      else
-        let n += 1
-      endif
-    endfor
-  endif
-  if order != []
-    let order_list += [order]
-  endif
-  call winrestview(view)
   return order_list
 endfunction "}}}
 " function! s:matchaddpos(group, pos) abort "{{{
