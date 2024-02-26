@@ -4,6 +4,7 @@ set cpoptions&vim
 let g:highlightedundo#highlight_mode = get(g:, 'highlightedundo#highlight_mode', 1)
 let g:highlightedundo#highlight_duration_delete = get(g:, 'highlightedundo#highlight_duration_delete', 200)
 let g:highlightedundo#highlight_duration_add = get(g:, 'highlightedundo#highlight_duration_add', 500)
+let g:highlightedundo#highlight_extra_lines = get(g:, 'highlightedundo#highlight_extra_lines', &lines)
 
 let s:TEMPBEFORE = ''
 let s:TEMPAFTER = ''
@@ -40,15 +41,21 @@ function! s:common(count, command, countercommand) abort "{{{
   endif
 
   let view = winsaveview()
+  let countstr = a:count == 1 ? '' : string(a:count)
+  let before = getline(1, '$')
+  let [start_before, end_before] = s:highlight_range(g:highlightedundo#highlight_extra_lines)
+  execute 'silent noautocmd normal! ' . countstr . a:command
+  let after = getline(1, '$')
+  let [start_after, end_after] = s:highlight_range(g:highlightedundo#highlight_extra_lines)
   try
-    let diffoutput = s:getdiff(a:count, a:command, a:countercommand)
-    let difflist = s:parsediff(diffoutput)
-  catch
-    execute "silent normal! " . a:count . a:command
-    return
+    let diffoutput = s:calldiff(before, after)
   finally
+    if a:countercommand !=# ''
+      execute 'silent noautocmd normal! ' . countstr . a:countercommand
+    endif
     call winrestview(view)
   endtry
+  let difflist = s:parsediff(diffoutput, start_before, end_before, start_after, end_after)
 
   let originalcursor = s:hidecursor()
   try
@@ -59,6 +66,11 @@ function! s:common(count, command, countercommand) abort "{{{
   finally
     call s:restorecursor(originalcursor)
   endtry
+endfunction "}}}
+function! s:highlight_range(extra_lines) abort "{{{
+  let highlight_start = max([1, line('w0') - a:extra_lines])
+  let highlight_end = min([line('$'), line('w$') + a:extra_lines])
+  return [highlight_start, highlight_end]
 endfunction "}}}
 function! s:hidecursor() abort "{{{
   if s:GUI_RUNNING
@@ -117,37 +129,39 @@ let s:diff = {
   \   'add': [],
   \   'delete': [],
   \ }
-function! s:Diff(kind, from, to, lines) abort
+function! s:Diff(kind, delete_lines, add_lines) abort
   let diff = deepcopy(s:diff)
   let diff.kind = a:kind
   if a:kind ==# 'a'
-    let addsubdiff = s:subdifflist_add(a:to[0], a:to[1], a:lines.add)
+    let startline = a:add_lines[0][0]
+    let endline = a:add_lines[-1][0]
+    let lines = map(copy(a:add_lines), 'v:val[1]')
+    let addsubdiff = s:subdifflist_add(startline, endline, lines)
     call add(diff.add, addsubdiff)
   elseif a:kind ==# 'd'
-    let delsubdiff = s:subdifflist_delete(a:from[0], a:from[1], a:lines.delete)
+    let startline = a:delete_lines[0][0]
+    let endline = a:delete_lines[-1][0]
+    let lines = map(copy(a:delete_lines), 'v:val[1]')
+    let delsubdiff = s:subdifflist_delete(startline, endline, lines)
     call add(diff.delete, delsubdiff)
   elseif a:kind ==# 'c'
-    let fromlinenrlist = range(a:from[0], a:from[1])
-    let tolinenrlist = range(a:to[0], a:to[1])
-    " XXX: To make it faster, restrict max 100 diff changes.
-    for i in range(min([max([len(fromlinenrlist), len(tolinenrlist)]), 100]))
-      if i < len(fromlinenrlist) && i < len(tolinenrlist)
-        let before = a:lines.delete[i]
-        let after = a:lines.add[i]
-        let fromlinenr = fromlinenrlist[i]
-        let tolinenr = tolinenrlist[i]
+    let n_delete = len(a:delete_lines)
+    let n_add = len(a:add_lines)
+    let n = max([n_delete, n_add])
+    for i in range(n)
+      if i < n_delete && i < n_add
+        let [fromlinenr, before] = a:delete_lines[i]
+        let [tolinenr, after] = a:add_lines[i]
         let [delsubdiffs, addsubdiffs] = s:subdifflist_change(fromlinenr, tolinenr, before, after)
         call extend(diff.delete, delsubdiffs)
         call extend(diff.add, addsubdiffs)
-      elseif i < len(fromlinenrlist)
-        let before = a:lines.delete[i]
-        let linenr = fromlinenrlist[i]
-        let delsubdiff = s:subdifflist_delete(linenr, linenr, [before])
+      elseif i < n_delete
+        let [fromlinenr, before] = a:delete_lines[i]
+        let delsubdiff = s:subdifflist_delete(fromlinenr, fromlinenr, [before])
         call add(diff.delete, delsubdiff)
-      elseif i < len(tolinenrlist)
-        let after = a:lines.add[i]
-        let linenr = tolinenrlist[i]
-        let addsubdiff = s:subdifflist_add(linenr, linenr, [after])
+      elseif i < n_add
+        let [tolinenr, after] = a:add_lines[i]
+        let addsubdiff = s:subdifflist_add(tolinenr, tolinenr, [after])
         call add(diff.add, addsubdiff)
       endif
     endfor
@@ -415,37 +429,46 @@ function! s:expandlinestr(linestr) abort "{{{
   endif
   return linenr
 endfunction "}}}
-function! s:parsechunk(diffoutput, from, to, i, n) abort "{{{
+function! s:parsechunk(diffoutput, i, kind, fromlinenr, tolinenr, start_before, end_before, start_after, end_after) abort "{{{
   let i = a:i
-  let lines = {}
-  let lines.add = []
-  let lines.delete = []
-  while i < a:n
-    let line = a:diffoutput[i]
-    if !empty(matchstr(line, '\m\C^\d\+\%(,\d\+\)\?[acd]\d\+\%(,\d\+\)\?'))
-      break
-    endif
-
-    " XXX: For performance, check only up to 250 chars.
-    let [addedline, pos, _] = matchstrpos(line, '\m^>\s\zs.\{,250}')
-    if pos != -1
-      call add(lines.add, addedline)
+  let add_lines = []
+  let delete_lines = []
+  " FIXME: This is not the best implementation, the range of for loop should
+  "        be statistically determined.
+  " XXX: For performance, check only up to 250 chars.
+  if a:kind is# 'd' || a:kind is# 'c'
+    for linenr in range(a:fromlinenr[0], a:fromlinenr[1])
+      if a:start_before <= linenr && linenr <= a:end_before
+        let line = a:diffoutput[i]
+        let [deletedline, pos, _] = matchstrpos(line, '\m^<\s\zs.\{,250}')
+        if pos != -1
+          call add(delete_lines, [linenr, deletedline])
+        endif
+      endif
       let i += 1
-      continue
-    endif
+    endfor
+  endif
 
-    let [deletedline, pos, _] = matchstrpos(line, '\m^<\s\zs.\{,250}')
-    if pos != -1
-      call add(lines.delete, deletedline)
-      let i += 1
-      continue
-    endif
-
+  " skip '---'
+  if a:kind is# 'c'
     let i += 1
-  endwhile
-  return [lines, i]
+  endif
+
+  if a:kind is# 'a' || a:kind is# 'c'
+    for linenr in range(a:tolinenr[0], a:tolinenr[1])
+      if a:start_after <= linenr && linenr <= a:end_after
+        let line = a:diffoutput[i]
+        let [addedline, pos, _] = matchstrpos(line, '\m^>\s\zs.\{,250}')
+        if pos != -1
+          call add(add_lines, [linenr, addedline])
+        endif
+      endif
+      let i += 1
+    endfor
+  endif
+  return [delete_lines, add_lines, i]
 endfunction "}}}
-function! s:parsediff(diffoutput) abort "{{{
+function! s:parsediff(diffoutput, start_before, end_before, start_after, end_after) abort "{{{
   if a:diffoutput == []
     return []
   endif
@@ -455,35 +478,22 @@ function! s:parsediff(diffoutput) abort "{{{
   let i = 0
   while i < n
     let line = a:diffoutput[i]
-    let [whole, from, kind, to, _, _, _, _, _, _] = matchlist(line, '\m\C^\(\d\+\%(,\d\+\)\?\)\([acd]\)\(\d\+\%(,\d\+\)\?\)')
-    let i += 1
-    if empty(whole)
+    let res = matchlist(line, '\m\C^\(\d\+\%(,\d\+\)\?\)\([acd]\)\(\d\+\%(,\d\+\)\?\)')
+    if res == []
       continue
     endif
+    let [whole, from, kind, to, _, _, _, _, _, _] = res
+    let i += 1
 
     let fromlinenr = s:expandlinestr(from)
     let tolinenr = s:expandlinestr(to)
-    let [lines, i] = s:parsechunk(a:diffoutput, from, to, i, n)
-    let diff = s:Diff(kind, fromlinenr, tolinenr, lines)
+    let [delete_lines, add_lines, i] = s:parsechunk(
+            \ a:diffoutput, i, kind, fromlinenr, tolinenr,
+            \ a:start_before, a:end_before, a:start_after, a:end_after)
+    let diff = s:Diff(kind, delete_lines, add_lines)
     call add(parsed, diff)
   endwhile
   return parsed
-endfunction "}}}
-function! s:getdiff(count, command, countercommand) abort "{{{
-  let view = winsaveview()
-  let countstr = a:count == 1 ? '' : string(a:count)
-
-  let before = getline(1, '$')
-  execute 'silent noautocmd normal! ' . countstr . a:command
-  let after = getline(1, '$')
-  let diffoutput = s:calldiff(before, after)
-  if a:countercommand ==# ''
-    return diffoutput
-  endif
-
-  execute 'silent noautocmd normal! ' . countstr . a:countercommand
-  call winrestview(view)
-  return diffoutput
 endfunction "}}}
 function! s:waitforinput(duration) abort "{{{
   let clock = highlightedundo#clock#new()
