@@ -3,7 +3,7 @@ Make the undo region apparent!
 
 ## Dependency
 
-Vim 7.4.1685+ (or, neovim 0.2.0+)
+Vim 8.0+
 
 `diff` command (https://www.gnu.org/software/diffutils/) is required to use this plugin.
 

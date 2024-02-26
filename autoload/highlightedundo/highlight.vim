@@ -84,13 +84,13 @@ function! s:highlight.show(...) dict abort "{{{
   endif
 
   for order in self.order_list
-    let self.id += s:matchaddpos(hi_group, order)
+    let self.id += [matchaddpos(hi_group, order)]
   endfor
   call filter(self.id, 'v:val > 0')
   let self.status = s:on
   let self.group = hi_group
   let self.bufnr = bufnr('%')
-  let self.winid = s:win_getid()
+  let self.winid = win_getid()
   return 1
 endfunction "}}}
 function! s:highlight.quench(...) dict abort "{{{
@@ -112,9 +112,9 @@ function! s:highlight._quench() abort "{{{
     return
   endif
 
-  let winid = s:win_getid()
+  let winid = win_getid()
   let view = winsaveview()
-  if s:win_getid() == self.winid
+  if winid == self.winid
     call s:matchdelete_all(self.id)
     let succeeded = 1
   else
@@ -125,14 +125,14 @@ function! s:highlight._quench() abort "{{{
       augroup END
       let succeeded = 0
     else
-      let reached = s:win_gotoid(self.winid)
+      noautocmd let reached = win_gotoid(self.winid)
       if reached
         call s:matchdelete_all(self.id)
       else
         call filter(self.id, 0)
       endif
       let succeeded = 1
-      call s:win_gotoid(winid)
+      noautocmd call win_gotoid(winid)
       call winrestview(view)
     endif
   endif
@@ -179,7 +179,7 @@ function! s:cancel_highlight(id) abort  "{{{
 endfunction "}}}
 function! s:switch_highlight(id) abort "{{{
   let highlight = s:quench_table[a:id]
-  if highlight != {} && highlight.winid == s:win_getid()
+  if highlight != {} && highlight.winid == win_getid()
     if highlight.bufnr == bufnr('%')
       call highlight.show()
     else
@@ -244,25 +244,6 @@ function! s:highlight_order_linewise(region) abort  "{{{
   endif
   return order_list
 endfunction "}}}
-" function! s:matchaddpos(group, pos) abort "{{{
-if s:has_patch_7_4_362
-  function! s:matchaddpos(group, pos) abort
-    return [matchaddpos(a:group, a:pos)]
-  endfunction
-else
-  function! s:matchaddpos(group, pos) abort
-    let id_list = []
-    for pos in a:pos
-      if len(pos) == 1
-        let id_list += [matchadd(a:group, printf('\%%%dl', pos[0]))]
-      else
-        let id_list += [matchadd(a:group, printf('\%%%dl\%%>%dc.*\%%<%dc', pos[0], pos[1]-1, pos[1]+pos[2]))]
-      endif
-    endfor
-    return id_list
-  endfunction
-endif
-"}}}
 function! s:matchdelete_all(ids) abort "{{{
   if empty(a:ids)
     return
@@ -332,45 +313,6 @@ function! s:restore_options(options) abort "{{{
   endif
 endfunction "}}}
 
-" for compatibility
-" function! s:win_getid(...) abort{{{
-if exists('*win_getid')
-  let s:win_getid = function('win_getid')
-else
-  function! s:win_getid(...) abort
-    let winnr = get(a:000, 0, winnr())
-    let tabnr = get(a:000, 1, tabpagenr())
-  endfunction
-endif
-"}}}
-" function! s:win_gotoid(id) abort{{{
-if exists('*win_gotoid')
-  function! s:win_gotoid(id) abort
-    noautocmd let ret = win_gotoid(a:id)
-    return ret
-  endfunction
-else
-  function! s:win_gotoid(id) abort
-    let [winnr, tabnr] = a:id
-
-    if tabnr != tabpagenr()
-      execute 'noautocmd tabnext ' . tabnr
-      if tabpagenr() != tabnr
-        return 0
-      endif
-    endif
-
-    try
-      if winnr != winnr()
-        execute printf('noautocmd %swincmd w', winnr)
-      endif
-    catch /^Vim\%((\a\+)\)\=:E16/
-      return 0
-    endtry
-    return 1
-  endfunction
-endif
-"}}}
 
 let &cpoptions = s:save_cpo
 unlet s:save_cpo
