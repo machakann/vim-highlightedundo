@@ -474,14 +474,12 @@ function! s:getdiff(count, command, countercommand) abort "{{{
   let before = getline(1, '$')
   execute 'silent noautocmd normal! ' . countstr . a:command
   let after = getline(1, '$')
-  let diffoutput = s:calldiff(before, after)
-  if a:countercommand ==# ''
-    return diffoutput
-  endif
 
-  execute 'silent noautocmd normal! ' . countstr . a:countercommand
+  if a:countercommand !=# ''
+    execute 'silent noautocmd normal! ' . countstr . a:countercommand
+  endif
   call winrestview(view)
-  return diffoutput
+  return s:calldiff(before, after)
 endfunction "}}}
 function! s:waitforinput(duration) abort "{{{
   let clock = highlightedundo#clock#new()
