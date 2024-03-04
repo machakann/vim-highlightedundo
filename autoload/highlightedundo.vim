@@ -24,7 +24,7 @@ function! highlightedundo#Undo() abort "{{{
 endfunction "}}}
 function! highlightedundo#gminus() abort "{{{
   let undotree = undotree()
-  let safecount = min([v:count1, undotree.seq_cur - 1])
+  let safecount = min([v:count1, undotree.seq_cur + 1])
   call s:common(safecount, 'g-', 'g+')
 endfunction "}}}
 function! highlightedundo#gplus() abort "{{{
