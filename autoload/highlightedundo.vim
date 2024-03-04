@@ -24,7 +24,7 @@ function! highlightedundo#Undo() abort "{{{
 endfunction "}}}
 function! highlightedundo#gminus() abort "{{{
   let undotree = undotree()
-  let safecount = min([v:count1, undotree.seq_cur - 1])
+  let safecount = min([v:count1, undotree.seq_cur + 1])
   call s:common(safecount, 'g-', 'g+')
 endfunction "}}}
 function! highlightedundo#gplus() abort "{{{
@@ -474,14 +474,12 @@ function! s:getdiff(count, command, countercommand) abort "{{{
   let before = getline(1, '$')
   execute 'silent noautocmd normal! ' . countstr . a:command
   let after = getline(1, '$')
-  let diffoutput = s:calldiff(before, after)
-  if a:countercommand ==# ''
-    return diffoutput
-  endif
 
-  execute 'silent noautocmd normal! ' . countstr . a:countercommand
+  if a:countercommand !=# ''
+    execute 'silent noautocmd normal! ' . countstr . a:countercommand
+  endif
   call winrestview(view)
-  return diffoutput
+  return s:calldiff(before, after)
 endfunction "}}}
 function! s:waitforinput(duration) abort "{{{
   let clock = highlightedundo#clock#new()
@@ -503,28 +501,22 @@ function! s:blink(difflist, duration) abort "{{{
     return
   endif
 
-  let highlightlist = []
+  let h = highlightedundo#highlight#new()
   for diff in a:difflist
     for subdiff in diff.delete
       if filter(copy(subdiff.lines), '!empty(v:val)') == []
         continue
       endif
-      let h = highlightedundo#highlight#new(subdiff.region)
-      call h.show('HighlightedundoDelete')
-      call add(highlightlist, h)
+      call h.add(subdiff.region)
     endfor
   endfor
-  if empty(highlightlist)
-    return
-  endif
-
+  call h.show('HighlightedundoDelete')
   redraw
+
   try
     call s:waitforinput(a:duration)
   finally
-    for h in highlightlist
-      call h.quench()
-    endfor
+    call h.quench()
   endtry
 endfunction "}}}
 function! s:glow(difflist, duration) abort "{{{
@@ -535,17 +527,18 @@ function! s:glow(difflist, duration) abort "{{{
     return
   endif
 
+  let h = highlightedundo#highlight#new()
   let higroup = g:highlightedundo#highlight_mode == 1 ? 'HighlightedundoChange' : 'HighlightedundoAdd'
   for diff in a:difflist
     for subdiff in diff.add
       if filter(copy(subdiff.lines), '!empty(v:val)') == []
         continue
       endif
-      let h = highlightedundo#highlight#new(subdiff.region)
-      call h.show(higroup)
-      call h.quench_timer(a:duration)
+      call h.add(subdiff.region)
     endfor
   endfor
+  call h.show(higroup)
+  call h.quench_timer(a:duration)
 endfunction "}}}
 
 " solving Longest Common Subsequence problem

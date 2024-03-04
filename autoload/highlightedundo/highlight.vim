@@ -35,17 +35,8 @@ let s:SID = printf("\<SNR>%s_", s:SID())
 delfunction s:SID
 "}}}
 
-function! highlightedundo#highlight#new(region) abort  "{{{
-  let highlight = deepcopy(s:highlight)
-  let highlight.region = deepcopy(a:region)
-  if a:region.wise ==# 'char' || a:region.wise ==# 'v'
-    let highlight.order_list = s:highlight_order_charwise(a:region)
-  elseif a:region.wise ==# 'line' || a:region.wise ==# 'V'
-    let highlight.order_list = s:highlight_order_linewise(a:region)
-  elseif a:region.wise ==# 'block' || a:region.wise[0] ==# "\<C-v>"
-    let highlight.order_list = s:highlight_order_blockwise(a:region)
-  endif
-  return highlight
+function! highlightedundo#highlight#new() abort  "{{{
+  return deepcopy(s:highlight)
 endfunction "}}}
 
 " s:highlight "{{{
@@ -59,6 +50,16 @@ let s:highlight = {
       \   'winid': 0,
       \ }
 "}}}
+function! s:highlight.add(region) abort "{{{
+  let self.region = deepcopy(a:region)
+  if a:region.wise ==# 'char' || a:region.wise ==# 'v'
+    let self.order_list += s:highlight_order_charwise(a:region)
+  elseif a:region.wise ==# 'line' || a:region.wise ==# 'V'
+    let self.order_list += s:highlight_order_linewise(a:region)
+  elseif a:region.wise ==# 'block' || a:region.wise[0] ==# "\<C-v>"
+    let self.order_list += s:highlight_order_blockwise(a:region)
+  endif
+endfunction "}}}
 function! s:highlight.show(...) dict abort "{{{
   if empty(self.order_list)
     return 0
