@@ -17,6 +17,7 @@ endfunction
 " undo
 function! s:suite.undo_redo() abort "{{{
   normal! Afoo
+  execute "normal! i\<C-g>u"
   normal u
   call g:assert.equals(getline('.'), '', '#1')
 
@@ -75,7 +76,9 @@ function! s:suite.undo_redo() abort "{{{
 endfunction "}}}
 function! s:suite.gplus_gminus() abort "{{{
   normal! Afoo
+  execute "normal! i\<C-g>u"
   normal! Abar
+  execute "normal! i\<C-g>u"
   normal! u
   normal! Abaz
 
