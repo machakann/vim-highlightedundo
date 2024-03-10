@@ -43,52 +43,29 @@ let s:quench_table = {}
 " s:highlight "{{{
 let s:highlight = {
       \   'status': s:off,
-      \   'group': '',
       \   'id': [],
       \   'order_list': [],
-      \   'region': {},
       \   'bufnr': 0,
       \   'winid': 0,
       \   'timer_id': 0,
       \ }
 "}}}
-function! s:highlight.add(region) abort "{{{
-  let self.region = deepcopy(a:region)
-  if a:region.wise ==# 'char' || a:region.wise ==# 'v'
-    let self.order_list += s:highlight_order_charwise(a:region)
-  elseif a:region.wise ==# 'line' || a:region.wise ==# 'V'
-    let self.order_list += s:highlight_order_linewise(a:region)
-  endif
+function! s:highlight.add(hi_group, order) abort "{{{
+  call add(self.order_list, [a:hi_group, a:order])
 endfunction "}}}
-function! s:highlight.show(...) dict abort "{{{
+function! s:highlight.show() dict abort "{{{
   if empty(self.order_list)
     return 0
   endif
-
-  if a:0 < 1
-    if empty(self.group)
-      return 0
-    else
-      let hi_group = self.group
-    endif
-  else
-    let hi_group = a:1
-  endif
-
   if self.status is s:on
-    if hi_group ==# self.group
-      return 0
-    else
-      call self.quench()
-    endif
+    call self.quench()
   endif
 
-  for order in self.order_list
-    let self.id += [matchaddpos(hi_group, order)]
+  for [hi_group, order] in self.order_list
+    let self.id += [matchaddpos(hi_group, [order])]
   endfor
   call filter(self.id, 'v:val > 0')
   let self.status = s:on
-  let self.group = hi_group
   let self.bufnr = bufnr('%')
   let self.winid = win_getid()
   return 1
@@ -105,7 +82,6 @@ function! s:highlight.quench(...) dict abort "{{{
   endtry
   call timer_stop(self.timer_id)
   call s:clear_autocmds()
-  redraw
 endfunction "}}}
 function! s:highlight._quench() abort "{{{
   if self.status is s:off
@@ -189,61 +165,6 @@ function! s:switch_highlight(id) abort "{{{
 endfunction "}}}
 
 
-" private functions
-function! s:highlight_order_charwise(region) abort  "{{{
-  let order = []
-  let order_list = []
-  let n = 0
-  if a:region.head != s:null_pos && a:region.tail != s:null_pos && s:is_equal_or_ahead(a:region.tail, a:region.head)
-    if a:region.head[1] == a:region.tail[1]
-      let order += [a:region.head[1:2] + [a:region.tail[2] - a:region.head[2] + 1]]
-      let n += 1
-    else
-      for lnum in range(a:region.head[1], a:region.tail[1])
-        if lnum == a:region.head[1]
-          let order += [a:region.head[1:2] + [col([a:region.head[1], '$']) - a:region.head[2] + 1]]
-        elseif lnum == a:region.tail[1]
-          let order += [[a:region.tail[1], 1] + [a:region.tail[2]]]
-        else
-          let order += [[lnum]]
-        endif
-
-        if n == 7
-          let order_list += [order]
-          let order = []
-          let n = 0
-        else
-          let n += 1
-        endif
-      endfor
-    endif
-  endif
-  if order != []
-    let order_list += [order]
-  endif
-  return order_list
-endfunction "}}}
-function! s:highlight_order_linewise(region) abort  "{{{
-  let order = []
-  let order_list = []
-  let n = 0
-  if a:region.head != s:null_pos && a:region.tail != s:null_pos && a:region.head[1] <= a:region.tail[1]
-    for lnum in range(a:region.head[1], a:region.tail[1])
-      let order += [[lnum]]
-      if n == 7
-        let order_list += [order]
-        let order = []
-        let n = 0
-      else
-        let n += 1
-      endif
-    endfor
-  endif
-  if order != []
-    let order_list += [order]
-  endif
-  return order_list
-endfunction "}}}
 function! s:matchdelete_all(ids) abort "{{{
   if empty(a:ids)
     return
@@ -266,9 +187,6 @@ function! s:matchdelete_all(ids) abort "{{{
     endtry
   endfor
   call filter(a:ids, 0)
-endfunction "}}}
-function! s:is_equal_or_ahead(pos1, pos2) abort  "{{{
-  return a:pos1[1] > a:pos2[1] || (a:pos1[1] == a:pos2[1] && a:pos1[2] >= a:pos2[2])
 endfunction "}}}
 " function! s:is_in_cmdline_window() abort  "{{{
 if s:has_patch_7_4_392

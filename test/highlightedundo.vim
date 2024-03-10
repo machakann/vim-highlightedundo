@@ -2,6 +2,7 @@ let s:suite = themis#suite('highlightedundo: ')
 let s:scope = themis#helper('scope')
 let s:highlightedundo = s:scope.funcs('autoload/highlightedundo.vim')
 
+
 function! s:suite.before_each() abort "{{{
   new
 endfunction
@@ -14,8 +15,13 @@ function! s:suite.after() abort "{{{
 endfunction
 "}}}
 
-" undo
-function! s:suite.undo_redo() abort "{{{
+
+function! s:all(bools) abort "{{{
+  return filter(copy(a:bools), '!v:val') == []
+endfunction "}}}
+
+
+function! s:test_undo_redo() abort "{{{
   normal! Afoo
   execute "normal! i\<C-g>u"
   normal u
@@ -74,7 +80,7 @@ function! s:suite.undo_redo() abort "{{{
   execute "normal 2\<C-r>"
   call g:assert.equals(getline('.'), 'foobaz', '#17')
 endfunction "}}}
-function! s:suite.gplus_gminus() abort "{{{
+function! s:test_gplus_gminus() abort "{{{
   normal! Afoo
   execute "normal! i\<C-g>u"
   normal! Abar
@@ -120,7 +126,7 @@ function! s:suite.gplus_gminus() abort "{{{
   normal 4g+
   call g:assert.equals(getline('.'), 'foobaz', '#12')
 endfunction "}}}
-function! s:suite.reset_undolebels() abort "{{{
+function! s:test_reset_undolebels() abort "{{{
   normal! Afoo
   let old_undolevels = &undolevels
   set undolevels=-1
@@ -132,6 +138,483 @@ function! s:suite.reset_undolebels() abort "{{{
 
   execute "normal \<C-r>"
   call g:assert.equals(getline('.'), 'foo', '#2')
+endfunction "}}}
+
+
+function! s:suite.chardiff() abort "{{{
+  call g:assert.equals(
+  \ highlightedundo#chardiff#diff('abc', 'abc'),
+  \ [], '#1')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uabc'),
+  \ [[[1, 0], [1, 1]]], '#2')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uuuabc'),
+  \ [[[1, 0], [1, 3]]], '#3')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uabc', 'abc'),
+  \ [[[1, 1], [1, 0]]], '#4')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uuuabc', 'abc'),
+  \ [[[1, 3], [1, 0]]], '#5')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uabcv'),
+  \ [[[1, 0], [1, 1]], [[4, 0], [5, 1]]], '#6')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uuuabcvvv'),
+  \ [[[1, 0], [1, 3]], [[4, 0], [7, 3]]], '#7')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uabcv', 'abc'),
+  \ [[[1, 1], [1, 0]], [[5, 1], [4, 0]]], '#8')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uuuabcvvv', 'abc'),
+  \ [[[1, 3], [1, 0]], [[7, 3], [4, 0]]], '#9')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uab'),
+  \ [[[1, 3], [1, 3]]], '#10')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'abv'),
+  \ [[[1, 3], [1, 3]]], '#11')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uabv'),
+  \ [[[1, 3], [1, 4]]], '#12')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uabv', 'abc'),
+  \ [[[1, 4], [1, 3]]], '#13')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('abcuuu', 'abcuuu'),
+  \ [], '#14')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('abcuuuuuu', 'uuuuuu'),
+  \ [[[1, 3], [1, 0]]], '#15')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uuuuuu', 'abcuuuuuu'),
+  \ [[[1, 0], [1, 3]]], '#16')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uuuabcuuu', 'uuuuuu'),
+  \ [[[4, 3], [4, 0]]], '#17')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uuuuuu', 'uuuabcuuu'),
+  \ [[[4, 0], [4, 3]]], '#18')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('abcuuu', 'abcvvv'),
+  \ [[[4, 3], [4, 3]]], '#19')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uuuabc', 'vvvabc'),
+  \ [[[1, 3], [1, 3]]], '#20')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uuuabcvvv', 'wwwabcxxx'),
+  \ [[[1, 3], [1, 3]], [[7, 3], [7, 3]]], '#21')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uuabcvvvv', 'vvvabcuuu'),
+  \ [[[1, 2], [1, 3]], [[6, 4], [7, 3]]], '#22')
+
+  " There are several interpretations for this problem,
+  " this might be flaky
+  call g:assert.equals(highlightedundo#chardiff#diff('uuabcvv', 'vvabcuu'),
+  \ [[[1, 2], [1, 2]], [[6, 2], [6, 2]]], '#23')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('uuuuu', 'uuu'),
+  \ [[[4, 2], [4, 0]]], '#24')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('foo(bar)', 'foo(qux)'),
+  \ [[[5, 3], [5, 3]]], '#25')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('foo(bar(qux), baz)', 'foo(qux, baz)'),
+  \ [[[5, 4], [5, 0]], [[12, 1], [8, 0]]], '#26')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('foo(qux, baz)', 'foo(bar(qux), baz)'),
+  \ [[[5, 0], [5, 4]], [[8, 0], [12, 1]]], '#27')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('foo(bar(A), B)', 'foo(A, B)'),
+  \ [[[5, 6], [5, 1]]], '#28')
+
+  call g:assert.equals(highlightedundo#chardiff#diff('foobarbaz(qux), foobarbaz(corge)', 'qux, foobarbaz(corge)'),
+  \ [[[1, 10], [1, 0]], [[14, 1], [4, 0]]], '#29')
+endfunction "}}}
+function! s:suite.diff() abort "{{{
+  let before = ['abc']
+  let after = ['abc']
+  call g:assert.equals(
+  \ s:highlightedundo.diff(before, after),
+  \ [],
+  \ '#1')
+
+  let before = ['abc']
+  let after = ['']
+  call g:assert.equals(
+  \ s:highlightedundo.diff(before, after),
+  \ [{'from_idx': 0, 'from_count': 1, 'to_idx': 0, 'to_count': 1}],
+  \ '#2')
+
+  let before = ['']
+  let after = ['abc']
+  call g:assert.equals(
+  \ s:highlightedundo.diff(before, after),
+  \ [{'from_idx': 0, 'from_count': 1, 'to_idx': 0, 'to_count': 1}],
+  \ '#3')
+
+  let before = ['abc']
+  let after = ['def']
+  call g:assert.equals(
+  \ s:highlightedundo.diff(before, after),
+  \ [{'from_idx': 0, 'from_count': 1, 'to_idx': 0, 'to_count': 1}],
+  \ '#4')
+
+  let before = ['xxx', 'abc']
+  let after = ['abc']
+  call g:assert.equals(
+  \ s:highlightedundo.diff(before, after),
+  \ [{'from_idx': 0, 'from_count': 1, 'to_idx': 0, 'to_count': 0}],
+  \ '#5')
+
+  let before = ['abc', 'xxx']
+  let after = ['abc']
+  call g:assert.equals(
+  \ s:highlightedundo.diff(before, after),
+  \ [{'from_idx': 1, 'from_count': 1, 'to_idx': 1, 'to_count': 0}],
+  \ '#6')
+
+  let before = ['abc']
+  let after = ['xxx', 'abc']
+  call g:assert.equals(
+  \ s:highlightedundo.diff(before, after),
+  \ [{'from_idx': 0, 'from_count': 0, 'to_idx': 0, 'to_count': 1}],
+  \ '#7')
+
+  let before = ['abc']
+  let after = ['abc', 'xxx']
+  call g:assert.equals(
+  \ s:highlightedundo.diff(before, after),
+  \ [{'from_idx': 1, 'from_count': 0, 'to_idx': 1, 'to_count': 1}],
+  \ '#8')
+
+  let before = ['abc', 'xxx']
+  let after = ['abc', 'yyy']
+  call g:assert.equals(
+  \ s:highlightedundo.diff(before, after),
+  \ [{'from_idx': 1, 'from_count': 1, 'to_idx': 1, 'to_count': 1}],
+  \ '#9')
+endfunction "}}}
+function! s:suite.parsediff() abort "{{{
+  let before = ['abc']
+  let after = ['abc']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [],
+  \ '#1')
+
+  let before = ['xxx', 'abc']
+  let after = ['abc']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('d', [1]),
+  \ ],
+  \ '#2')
+
+  let before = ['xxx', 'yyy', 'abc']
+  let after = ['abc']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('d', [1]),
+  \   s:highlightedundo.Diff('d', [2]),
+  \ ],
+  \ '#3')
+
+  let before = ['abc', 'xxx', 'yyy']
+  let after = ['abc']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('d', [2]),
+  \   s:highlightedundo.Diff('d', [3]),
+  \ ],
+  \ '#4')
+
+  let before = ['xxx', 'abc', 'yyy']
+  let after = ['abc']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('d', [1]),
+  \   s:highlightedundo.Diff('d', [3]),
+  \ ],
+  \ '#5')
+
+  let before = ['abc']
+  let after = ['xxx', 'abc']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('a', [1]),
+  \ ],
+  \ '#6')
+
+  let before = ['abc']
+  let after = ['xxx', 'yyy', 'abc']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('a', [1]),
+  \   s:highlightedundo.Diff('a', [2]),
+  \ ],
+  \ '#7')
+
+  let before = ['abc']
+  let after = ['abc', 'xxx', 'yyy']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('a', [2]),
+  \   s:highlightedundo.Diff('a', [3]),
+  \ ],
+  \ '#8')
+
+  let before = ['abc']
+  let after = ['xxx', 'abc', 'yyy']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('a', [1]),
+  \   s:highlightedundo.Diff('a', [3]),
+  \ ],
+  \ '#9')
+
+  let before = ['xxx', 'yyy', 'abc']
+  let after = ['uuu', 'vvv', 'abc']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('c', [1, 1, 3], [1, 1, 3]),
+  \   s:highlightedundo.Diff('c', [2, 1, 3], [2, 1, 3]),
+  \ ],
+  \ '#10')
+
+  let before = ['abc', 'xxx', 'yyy']
+  let after = ['abc', 'uuu', 'vvv']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('c', [2, 1, 3], [2, 1, 3]),
+  \   s:highlightedundo.Diff('c', [3, 1, 3], [3, 1, 3]),
+  \ ],
+  \ '#11')
+
+  let before = ['xxx', 'abc', 'yyy']
+  let after = ['uuu', 'abc', 'vvv']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('c', [1, 1, 3], [1, 1, 3]),
+  \   s:highlightedundo.Diff('c', [3, 1, 3], [3, 1, 3]),
+  \ ],
+  \ '#12')
+
+  let before = ['abc', 'xxx', 'yyy']
+  let after = ['abc', 'vvv']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('c', [2, 1, 3], [2, 1, 3]),
+  \   s:highlightedundo.Diff('d', [3]),
+  \ ],
+  \ '#13')
+
+  let before = ['xxx', 'yyy', 'abc']
+  let after = ['vvv', 'abc']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('c', [1, 1, 3], [1, 1, 3]),
+  \   s:highlightedundo.Diff('d', [2]),
+  \ ],
+  \ '#14')
+
+  let before = ['xxx', 'abc', 'yyy']
+  let after = ['vvv', 'abc']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('c', [1, 1, 3], [1, 1, 3]),
+  \   s:highlightedundo.Diff('d', [3]),
+  \ ],
+  \ '#15')
+
+  let before = ['abcd', 'xxx', 'yyy']
+  let after = ['abce', 'vvv']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('c', [1, 4, 1], [1, 4, 1]),
+  \   s:highlightedundo.Diff('c', [2, 1, 3], [2, 1, 3]),
+  \   s:highlightedundo.Diff('d', [3]),
+  \ ],
+  \ '#16')
+
+  let before = ['abce', 'vvv']
+  let after = ['xxx', 'abcd', 'yyy']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('a', [1]),
+  \   s:highlightedundo.Diff('c', [1, 4, 1], [2, 4, 1]),
+  \   s:highlightedundo.Diff('c', [2, 1, 3], [3, 1, 3]),
+  \ ],
+  \ '#17')
+
+  let before = ['abcd', 'vvv']
+  let after = ['xxx', 'yyy', 'abce']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('a', [1]),
+  \   s:highlightedundo.Diff('a', [2]),
+  \   s:highlightedundo.Diff('c', [1, 4, 1], [3, 4, 1]),
+  \   s:highlightedundo.Diff('d', [2]),
+  \ ],
+  \ '#18')
+
+  let before = ['abcd']
+  let after = ['xxx', 'abce', 'yyy']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('a', [1]),
+  \   s:highlightedundo.Diff('c', [1, 4, 1], [2, 4, 1]),
+  \   s:highlightedundo.Diff('a', [3]),
+  \ ],
+  \ '#19')
+
+  let before = ['foobarbaz']
+  let after = ['barbaz']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('d', [1, 1, 3]),
+  \ ],
+  \ '#20')
+
+  let before = ['foobarbaz', 'foobarbaz']
+  let after = ['foobarbazfoobarbaz']
+  let hunks = s:highlightedundo.diff(before, after)
+  call g:assert.equals(
+  \ s:highlightedundo.parsediff(hunks, before, after),
+  \ [
+  \   s:highlightedundo.Diff('a', [1, 10, 9]),
+  \   s:highlightedundo.Diff('d', [2]),
+  \ ],
+  \ '#21')
+
+
+
+  let before = repeat(['foo bar baz'], 1000)
+  let after = repeat(['foo bar qux'], 1000)
+  let hunks = s:highlightedundo.diff(before, after)
+  let result = s:highlightedundo.parsediff(hunks, before, after, [995, 999], [0, 4])
+  let diff_kind  = copy(result)
+                 \->map('v:val["kind"]')
+  let highlight_lines_before = copy(result)
+                             \->map('v:val["delete"]')
+                             \->map('v:val[0]')
+  let highlight_lines_after  = copy(result)
+                             \->map('v:val["add"]')
+                             \->map('v:val[0]')
+  call g:assert.equals(diff_kind,
+  \ ['c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], '#22')
+  call g:assert.equals(highlight_lines_before,
+  \ [1, 2, 3, 4, 5, 996, 997, 998, 999, 1000], '#23')
+  call g:assert.equals(highlight_lines_after,
+  \ [1, 2, 3, 4, 5, 996, 997, 998, 999, 1000], '#24')
+
+
+
+  let before = ['uuu'] + repeat(['foo bar baz'], 1000)
+  let after = repeat(['foo bar qux'], 1000)
+  let hunks = s:highlightedundo.diff(before, after)
+  let result = s:highlightedundo.parsediff(hunks, before, after, [0, 5], [995, 999])
+  let diff_kind  = copy(result)
+                \->map('v:val["kind"]')
+  let highlight_lines_before = copy(result)
+                            \->map('v:val["delete"]')
+                            \->filter('v:val != []')
+                            \->map('v:val[0]')
+  let highlight_lines_after  = copy(result)
+                            \->map('v:val["add"]')
+                            \->filter('v:val != []')
+                            \->map('v:val[0]')
+  call g:assert.equals(diff_kind,
+  \ ['d', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], '#25')
+  call g:assert.equals(highlight_lines_before, [1, 2, 3, 4, 5, 6, 997, 998, 999, 1000, 1001], '#26')
+  call g:assert.equals(highlight_lines_after, [1, 2, 3, 4, 5, 996, 997, 998, 999, 1000], '#27')
+
+
+
+  let before = repeat(['foo bar baz'], 1000) + ['vvv']
+  let after = repeat(['foo bar qux'], 1000)
+  let hunks = s:highlightedundo.diff(before, after)
+  let result = s:highlightedundo.parsediff(hunks, before, after, [996, 1000], [0, 4])
+  let diff_kind  = copy(result)
+                 \->map('v:val["kind"]')
+  let highlight_lines_before = copy(result)
+                             \->map('v:val["delete"]')
+                             \->filter('v:val != []')
+                             \->map('v:val[0]')
+  let highlight_lines_after  = copy(result)
+                             \->map('v:val["add"]')
+                             \->filter('v:val != []')
+                             \->map('v:val[0]')
+  call g:assert.equals(diff_kind,
+  \ ['c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'd'], '#28')
+  call g:assert.equals(highlight_lines_before, [1, 2, 3, 4, 5, 997, 998, 999, 1000, 1001], '#29')
+  call g:assert.equals(highlight_lines_after, [1, 2, 3, 4, 5, 997, 998, 999, 1000], '#30')
+endfunction "}}}
+
+
+function! s:suite.undo_redo_1step() abort "{{{
+  let g:highlightedundo#highlight_mode = 1
+  call s:test_undo_redo()
+endfunction "}}}
+function! s:suite.gplus_gminus_1step() abort "{{{
+  let g:highlightedundo#highlight_mode = 1
+  call s:test_gplus_gminus()
+endfunction "}}}
+function! s:suite.reset_undolebels_1step() abort "{{{
+  let g:highlightedundo#highlight_mode = 1
+  call s:test_reset_undolebels()
+endfunction "}}}
+function! s:suite.undo_redo_2step() abort "{{{
+  let g:highlightedundo#highlight_mode = 2
+  call s:test_undo_redo()
+endfunction "}}}
+function! s:suite.gplus_gminus_2step() abort "{{{
+  let g:highlightedundo#highlight_mode = 2
+  call s:test_gplus_gminus()
+endfunction "}}}
+function! s:suite.reset_undolebels_2step() abort "{{{
+  let g:highlightedundo#highlight_mode = 2
+  call s:test_reset_undolebels()
 endfunction "}}}
 
 " vim:set foldmethod=marker:

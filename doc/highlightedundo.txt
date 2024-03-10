@@ -1,12 +1,12 @@
 *highlightedundo.txt*	Make the undo region apparent!
-						Last change:24-Feb-2024.
+						Last change:10-Mar-2024.
 
 Author  : machakann <https://github.com/machakann>
 License : NYSL license
           Japanese <http://www.kmonos.net/nysl/>
           English (Unofficial) <http://www.kmonos.net/nysl/index.en.html>
 
-Requirement:	Vim 8.0 or higher
+Requirement:	Vim 8.1 or higher
 		|+reltime| feature
 		|+float| feature
 		|+timers| feature
