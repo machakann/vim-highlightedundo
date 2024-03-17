@@ -12,30 +12,41 @@ let s:GUI_RUNNING = has('gui_running')
 
 let s:highlights = []
 
-function! highlightedundo#undo() abort "{{{
+
+function! highlightedundo#undo() abort
   let [n, _] = s:undoablecount()
   let safecount = min([v:count1, n])
   call s:common(safecount, 'u', "\<C-r>")
-endfunction "}}}
-function! highlightedundo#redo() abort "{{{
+endfunction
+
+
+function! highlightedundo#redo() abort
   let [_, n] = s:undoablecount()
   let safecount = min([v:count1, n])
   call s:common(safecount, "\<C-r>", 'u')
-endfunction "}}}
-function! highlightedundo#Undo() abort "{{{
+endfunction
+
+
+function! highlightedundo#Undo() abort
   call s:common(1, 'U', 'U')
-endfunction "}}}
-function! highlightedundo#gminus() abort "{{{
+endfunction
+
+
+function! highlightedundo#gminus() abort
   let undotree = undotree()
   let safecount = min([v:count1, undotree.seq_cur + 1])
   call s:common(safecount, 'g-', 'g+')
-endfunction "}}}
-function! highlightedundo#gplus() abort "{{{
+endfunction
+
+
+function! highlightedundo#gplus() abort
   let undotree = undotree()
   let safecount = min([v:count1, undotree.seq_last - undotree.seq_cur])
   call s:common(safecount, 'g+', 'g-')
-endfunction "}}}
-function! s:common(count, command, countercommand) abort "{{{
+endfunction
+
+
+function! s:common(count, command, countercommand) abort
   if a:count <= 0
     return
   endif
@@ -66,13 +77,17 @@ function! s:common(count, command, countercommand) abort "{{{
   finally
     call s:restorecursor(originalcursor)
   endtry
-endfunction "}}}
-function! s:highlight_range(extra_lines) abort "{{{
+endfunction
+
+
+function! s:highlight_range(extra_lines) abort
   let highlight_start_idx = max([1, line('w0') - a:extra_lines]) - 1
   let highlight_end_idx = min([line('$'), line('w$') + a:extra_lines]) - 1
   return [highlight_start_idx, highlight_end_idx]
-endfunction "}}}
-function! s:hidecursor() abort "{{{
+endfunction
+
+
+function! s:hidecursor() abort
   if s:GUI_RUNNING
     let cursor = &guicursor
     set guicursor+=n-o:block-NONE
@@ -81,27 +96,30 @@ function! s:hidecursor() abort "{{{
     set t_ve=
   endif
   return cursor
-endfunction "}}}
-function! s:restorecursor(originalcursor) abort "{{{
+endfunction
+
+
+function! s:restorecursor(originalcursor) abort
   if s:GUI_RUNNING
     set guicursor&
     let &guicursor = a:originalcursor
   else
     let &t_ve = a:originalcursor
   endif
-endfunction "}}}
+endfunction
+
 
 " for debug
-function! highlightedundo#dumptree(filename) abort "{{{
+function! highlightedundo#dumptree(filename) abort
   call writefile([string(undotree())], a:filename)
-endfunction "}}}
+endfunction
 
 let s:Diff = {
 \   'kind': '',
 \   'delete': [],
 \   'add': [],
 \ }
-function! s:Diff(kind, list1, ...) abort "{{{
+function! s:Diff(kind, list1, ...) abort
   let diff = copy(s:Diff)
   let diff.kind = a:kind
   if a:kind is# 'a'
@@ -113,8 +131,10 @@ function! s:Diff(kind, list1, ...) abort "{{{
     let diff.add = copy(a:1)
   endif
   return diff
-endfunction "}}}
-function! s:undoablecount() abort "{{{
+endfunction
+
+
+function! s:undoablecount() abort
   let undotree = undotree()
   if undotree.entries == []
     return [0, 0]
@@ -166,8 +186,10 @@ function! s:undoablecount() abort "{{{
   let undocount = eval(join(parttree.pos, '+')) + 1
   let redocount = len(parttree.tree) - parttree.pos[-1] - 1
   return [undocount, redocount]
-endfunction "}}}
-function! s:calldiff(before, after) abort "{{{
+endfunction
+
+
+function! s:calldiff(before, after) abort
   if s:TEMPBEFORE ==# ''
     let s:TEMPBEFORE = tempname()
     let s:TEMPAFTER = tempname()
@@ -187,9 +209,11 @@ function! s:calldiff(before, after) abort "{{{
   let cmd = printf('diff -b "%s" "%s"', s:TEMPBEFORE, s:TEMPAFTER)
   let diff = split(s:system(cmd), '\r\?\n')
   return diff
-endfunction "}}}
+endfunction
+
+
 " NOTE: https://gist.github.com/mattn/566ba5fff15f947730f9c149e74f0eda
-function! s:system(cmd) abort "{{{
+function! s:system(cmd) abort
   let out = ''
   let job = job_start(a:cmd, {'out_cb': {ch,msg -> [execute('let out .= msg'), out]}, 'out_mode': 'raw'})
   while job_status(job) ==# 'run'
@@ -197,14 +221,17 @@ function! s:system(cmd) abort "{{{
   endwhile
   return out
 endfunction
-"}}}
-function! s:diff(before, after) abort "{{{
+
+
+function! s:diff(before, after) abort
   let diffoutput = s:calldiff(a:before, a:after)
   return copy(diffoutput)
   \ ->filter({-> v:val =~# '\m^\(\d\+\%(,\d\+\)\?\)\([acd]\)\(\d\+\%(,\d\+\)\?\)'})
   \ ->map({-> s:diffheader2dict(v:val)})
-endfunction "}}}
-function! s:diffheader2dict(header) abort "{{{
+endfunction
+
+
+function! s:diffheader2dict(header) abort
   " Convert '1a2'     -> #{from_idx: 0, from_count: 0, to_idx: 1, to_count, 1}
   " Convert '1a2,4'   -> #{from_idx: 0, from_count: 0, to_idx: 1, to_count, 3}
   " Convert '2d1'     -> #{from_idx: 1, from_count: 1, to_idx: 1, to_count, 0}
@@ -226,8 +253,10 @@ function! s:diffheader2dict(header) abort "{{{
     let d.to_count = 0
   endif
   return d
-endfunction "}}}
-function! s:parse_line_range(kind, str) abort "{{{
+endfunction
+
+
+function! s:parse_line_range(kind, str) abort
   let [start, end] = matchlist(a:str, '\m\(\d\+\)\%(,\(\d\+\)\)\?')[1:2]
   let idx = str2nr(start) - 1
   if end is# ''
@@ -236,8 +265,10 @@ function! s:parse_line_range(kind, str) abort "{{{
     let l:count = str2nr(end) - str2nr(start) + 1
   endif
   return [idx, l:count]
-endfunction "}}}
-function! s:parsediff(hunks, before, after, ...) abort "{{{
+endfunction
+
+
+function! s:parsediff(hunks, before, after, ...) abort
   let range_before = get(a:000, 0, [0, len(a:before) - 1])
   let range_after = get(a:000, 1, [0, len(a:after) - 1])
 
@@ -304,8 +335,10 @@ function! s:parsediff(hunks, before, after, ...) abort "{{{
     endif
   endfor
   return diffs
-endfunction "}}}
-function! s:add_changes(diffs, before, after, from_idx, to_idx, n, range_before, range_after) abort "{{{
+endfunction
+
+
+function! s:add_changes(diffs, before, after, from_idx, to_idx, n, range_before, range_after) abort
   let start = max([0, min([a:range_before[0] - a:from_idx, a:range_after[0] - a:to_idx])])
   let end = min([a:n - 1, max([a:range_before[1] - a:from_idx, a:range_after[1] - a:to_idx])])
   for i in range(start, end)
@@ -339,8 +372,10 @@ function! s:add_changes(diffs, before, after, from_idx, to_idx, n, range_before,
       endif
     endfor
   endfor
-endfunction "}}}
-function! s:search_correspondence(before, after, hunk) abort "{{{
+endfunction
+
+
+function! s:search_correspondence(before, after, hunk) abort
   let acceptable_shift = 5
   if len(a:before) <= len(a:after)
     let needle = a:before[a:hunk.from_idx]
@@ -374,14 +409,18 @@ function! s:search_correspondence(before, after, hunk) abort "{{{
     let correspondence = [corr_idx, a:hunk.to_idx]
   endif
   return correspondence
-endfunction "}}}
-function! s:quench_highlight() abort "{{{
+endfunction
+
+
+function! s:quench_highlight() abort
   for h in s:highlights
     call h.quench()
   endfor
   call filter(s:highlights, 0)
-endfunction "}}}
-function! s:blink(difflist, duration) abort "{{{
+endfunction
+
+
+function! s:blink(difflist, duration) abort
   if a:duration <= 0
     return
   endif
@@ -405,8 +444,10 @@ function! s:blink(difflist, duration) abort "{{{
   finally
     call h.quench()
   endtry
-endfunction "}}}
-function! s:waitforinput(duration) abort "{{{
+endfunction
+
+
+function! s:waitforinput(duration) abort
   let clock = highlightedundo#clock#new()
   let c = 0
   call clock.start()
@@ -417,8 +458,10 @@ function! s:waitforinput(duration) abort "{{{
     endif
   endwhile
   call clock.stop()
-endfunction "}}}
-function! s:glow(difflist, duration) abort "{{{
+endfunction
+
+
+function! s:glow(difflist, duration) abort
   if a:duration <= 0
     return
   endif
@@ -437,19 +480,10 @@ function! s:glow(difflist, duration) abort "{{{
   call h.show()
   call h.quench_timer(a:duration)
   call add(s:highlights, h)
-endfunction "}}}
-
-" function! Parsediff(before, after, ...) abort "{{{
-"   let range_before = get(a:000, 0, [0, len(a:before) - 1])
-"   let range_after = get(a:000, 1, [0, len(a:after) - 1])
-"   let hunks = s:diff(a:before, a:after)
-"   return s:parsediff(hunks, a:before, a:after, range_before, range_after)
-" endfunction "}}}
+endfunction
 
 
 let &cpoptions = s:save_cpo
 unlet s:save_cpo
 
-" vim:set foldmethod=marker:
-" vim:set commentstring="%s:
 " vim:set ts=2 sts=2 sw=2:
