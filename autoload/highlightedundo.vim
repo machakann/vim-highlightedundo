@@ -207,9 +207,9 @@ if exists('*diff')
 else
   function! s:diff(before, after) abort
     let diffoutput = s:calldiff(a:before, a:after)
-    return copy(diffoutput)
-    \ ->filter({-> v:val =~# '\m^\(\d\+\%(,\d\+\)\?\)\([acd]\)\(\d\+\%(,\d\+\)\?\)'})
-    \ ->map({-> s:diffheader2dict(v:val)})
+    let result = copy(diffoutput)
+    let result = filter(result, {-> v:val =~# '\m^\(\d\+\%(,\d\+\)\?\)\([acd]\)\(\d\+\%(,\d\+\)\?\)'})
+    return map(result, {-> s:diffheader2dict(v:val)})
   endfunction
 endif
 
