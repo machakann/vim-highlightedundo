@@ -53,14 +53,11 @@ endfunction
 
 
 function! s:highlight.quench(...) dict abort
-  let options = s:shift_options()
   try
     call self._quench()
   catch /^Vim\%((\a\+)\)\=:E523/
     " NOTE: In case of "textlock"ed!
     call self.quench_timer(1)
-  finally
-    call s:restore_options(options)
   endtry
   call timer_stop(self.timer_id)
   call s:clear_autocmds()
@@ -186,33 +183,6 @@ function! s:matchdelete_all(ids) abort
     endtry
   endfor
   call filter(a:ids, 0)
-endfunction
-
-
-function! s:shift_options() abort
-  let options = {}
-
-  """ tweak appearance
-  " hide_cursor
-  if s:GUI_RUNNING
-    let options.cursor = &guicursor
-    set guicursor+=a:block-NONE
-  else
-    let options.cursor = &t_ve
-    set t_ve=
-  endif
-
-  return options
-endfunction
-
-
-function! s:restore_options(options) abort
-  if s:GUI_RUNNING
-    set guicursor&
-    let &guicursor = a:options.cursor
-  else
-    let &t_ve = a:options.cursor
-  endif
 endfunction
 
 
