@@ -85,7 +85,7 @@ function! s:compare(A, B, chunklen) abort
     return [[[loffset + 1, Alen - loffset], [loffset + 1, 0]]]
   endif
 
-  let roffset = s:count_coincidence(reverse(a:A), reverse(a:B), 0, 0)
+  let roffset = s:count_coincidence(a:A, a:B, 0, 0, 1)
   let roffset = min([roffset, Alen - loffset, Blen - loffset])
   let imax = Alen - roffset
   let jmax = Blen - roffset
@@ -174,7 +174,8 @@ function! s:to_expr(str) abort
 endfunction
 
 
-function! s:count_coincidence(A, B, i, j) abort
+function! s:count_coincidence(A, B, i, j, ...) abort
+  let rev = get(a:000, 0, 0)
   let Alen = strlen(a:A)
   let Blen = strlen(a:B)
   let n = min([Alen - a:i, Blen - a:j])
@@ -182,11 +183,19 @@ function! s:count_coincidence(A, B, i, j) abort
     return 0
   endif
 
-  for k in range(n)
-    if a:A[a:i + k] !=# a:B[a:j + k]
-      return k
-    endif
-  endfor
+  if !rev
+    for k in range(n)
+      if a:A[a:i + k] !=# a:B[a:j + k]
+        return k
+      endif
+    endfor
+  else
+    for k in range(n)
+      if a:A[Alen - a:i - k - 1] !=# a:B[Blen - a:j - k - 1]
+        return k
+      endif
+    endfor
+  endif
   return n
 endfunction
 
