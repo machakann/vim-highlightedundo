@@ -58,7 +58,7 @@ function! s:highlight.quench(...) dict abort
     call self._quench()
   catch /^Vim\%((\a\+)\)\=:E523/
     " NOTE: In case of "textlock"ed!
-    call self.quench_timer(50)
+    call self.quench_timer(1)
   finally
     call s:restore_options(options)
   endtry
@@ -78,10 +78,12 @@ function! s:highlight._quench() abort
     call s:matchdelete_all(self.id)
     let succeeded = 1
   else
-    if getcmdwintype() !=# ''
+    if getcmdwintype() !=# '' || s:is_in_popup_terminal_window()
+      " NOTE: cannot move out from commandline-window
+      " NOTE: cannot move out from popup terminal window
       augroup highlightedundo-pause-quenching
         autocmd!
-        execute printf("autocmd CmdWinLeave * call s:after_CmdWinLeave(%d)", self.timer_id)
+        execute printf("autocmd WinEnter * call s:after_WinEnter(%d)", self.timer_id)
       augroup END
       let succeeded = 0
     else
@@ -114,7 +116,7 @@ function! s:highlight.quench_timer(time) dict abort
 endfunction
 
 
-function! s:after_CmdWinLeave(id) abort
+function! s:after_WinEnter(id) abort
   augroup highlightedundo-pause-quenching
     autocmd!
   augroup END
@@ -212,6 +214,17 @@ function! s:restore_options(options) abort
     let &t_ve = a:options.cursor
   endif
 endfunction
+
+
+if exists('*popup_list')
+  function! s:is_in_popup_terminal_window() abort
+    return &buftype is# 'terminal' && count(popup_list(), win_getid())
+  endfunction
+else
+  function! s:is_in_popup_terminal_window() abort
+    return 0
+  endfunction
+endif
 
 
 let &cpoptions = s:save_cpo
