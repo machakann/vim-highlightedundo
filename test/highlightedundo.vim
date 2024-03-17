@@ -5,6 +5,7 @@ let s:highlightedundo = s:scope.funcs('autoload/highlightedundo.vim')
 
 function! s:suite.before_each() abort "{{{
   new
+  let g:highlightedundo#debounce = 1
 endfunction
 "}}}
 function! s:suite.after_each() abort "{{{
@@ -25,59 +26,76 @@ function! s:test_undo_redo() abort "{{{
   normal! Afoo
   execute "normal! i\<C-g>u"
   normal u
+  sleep 2m
   call g:assert.equals(getline('.'), '', '#1')
 
   execute "normal \<C-r>"
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#2')
 
   normal! Abar
   normal u
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#3')
 
   execute "normal \<C-r>"
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobar', '#4')
 
   normal u
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#5')
 
   normal! Abaz
   normal u
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#6')
 
   execute "normal \<C-r>"
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobaz', '#7')
 
   execute "normal \<C-r>"
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobaz', '#8')
 
   normal u
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#9')
 
   normal u
+  sleep 2m
   call g:assert.equals(getline('.'), '', '#10')
 
   normal u
+  sleep 2m
   call g:assert.equals(getline('.'), '', '#11')
 
   execute "normal 2\<C-r>"
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobaz', '#12')
 
   normal 2u
+  sleep 2m
   call g:assert.equals(getline('.'), '', '#13')
 
   execute "normal 3\<C-r>"
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobaz', '#14')
 
   normal 3u
+  sleep 2m
   call g:assert.equals(getline('.'), '', '#15')
 
   execute "normal! 3\<C-r>"
   normal! Aqux
   normal 2u
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#16')
 
   normal! u
   execute "normal 2\<C-r>"
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobaz', '#17')
 endfunction "}}}
 function! s:test_gplus_gminus() abort "{{{
@@ -89,41 +107,53 @@ function! s:test_gplus_gminus() abort "{{{
   normal! Abaz
 
   normal g-
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobar', '#1')
 
   normal g-
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#2')
 
   normal g-
+  sleep 2m
   call g:assert.equals(getline('.'), '', '#3')
 
   normal g+
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#4')
 
   normal g+
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobar', '#5')
 
   normal g+
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobaz', '#6')
 
   normal 3g-
+  sleep 2m
   call g:assert.equals(getline('.'), '', '#7')
 
   normal 3g+
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobaz', '#8')
 
   normal 2g-
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#9')
 
   normal! g-
   normal 2g+
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobar', '#10')
 
   normal! g+
   normal 4g-
+  sleep 2m
   call g:assert.equals(getline('.'), '', '#11')
 
   normal 4g+
+  sleep 2m
   call g:assert.equals(getline('.'), 'foobaz', '#12')
 endfunction "}}}
 function! s:test_reset_undolebels() abort "{{{
@@ -134,9 +164,11 @@ function! s:test_reset_undolebels() abort "{{{
   let &undolevels = old_undolevels
   " undotree().entries should be empty now
   normal u
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#1')
 
   execute "normal \<C-r>"
+  sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#2')
 endfunction "}}}
 

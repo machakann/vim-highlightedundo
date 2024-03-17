@@ -5,6 +5,7 @@ let g:highlightedundo#highlight_mode = get(g:, 'highlightedundo#highlight_mode',
 let g:highlightedundo#highlight_duration_delete = get(g:, 'highlightedundo#highlight_duration_delete', 200)
 let g:highlightedundo#highlight_duration_add = get(g:, 'highlightedundo#highlight_duration_add', 500)
 let g:highlightedundo#highlight_extra_lines = get(g:, 'highlighbarundo#highlight_extra_lines', &lines)
+let g:highlightedundo#debounce = get(g:, 'highlightedundo#debounce', 60)
 
 let s:TEMPBEFORE = ''
 let s:TEMPAFTER = ''
@@ -14,37 +15,51 @@ let s:GUI_RUNNING = has('gui_running')
 function! highlightedundo#undo() abort
   let [n, _] = s:undoablecount()
   let safecount = min([v:count1, n])
-  call s:common(safecount, 'u', "\<C-r>")
+  call s:debounce(safecount, 'u', "\<C-r>")
 endfunction
 
 
 function! highlightedundo#redo() abort
   let [_, n] = s:undoablecount()
   let safecount = min([v:count1, n])
-  call s:common(safecount, "\<C-r>", 'u')
+  call s:debounce(safecount, "\<C-r>", 'u')
 endfunction
 
 
 function! highlightedundo#Undo() abort
-  call s:common(1, 'U', 'U')
+  call s:debounce(1, 'U', 'U')
 endfunction
 
 
 function! highlightedundo#gminus() abort
   let undotree = undotree()
   let safecount = min([v:count1, undotree.seq_cur + 1])
-  call s:common(safecount, 'g-', 'g+')
+  call s:debounce(safecount, 'g-', 'g+')
 endfunction
 
 
 function! highlightedundo#gplus() abort
   let undotree = undotree()
   let safecount = min([v:count1, undotree.seq_last - undotree.seq_cur])
-  call s:common(safecount, 'g+', 'g-')
+  call s:debounce(safecount, 'g+', 'g-')
 endfunction
 
 
+let s:command = ''
+let s:timer = -1
+function! s:debounce(count, command, countercommand) abort "{{{
+  if s:timer != -1
+    execute "normal! " . s:command
+    call timer_stop(s:timer)
+  endif
+  let s:command = a:command
+  let s:timer = timer_start(g:highlightedundo#debounce,
+  \ {-> s:common(a:count, a:command, a:countercommand)})
+endfunction "}}}
+
+
 function! s:common(count, command, countercommand) abort
+  let s:timer = -1
   if a:count <= 0
     return
   endif
