@@ -110,11 +110,6 @@ function! s:restorecursor(originalcursor) abort
 endfunction
 
 
-" for debug
-function! highlightedundo#dumptree(filename) abort
-  call writefile([string(undotree())], a:filename)
-endfunction
-
 let s:Diff = {
 \   'kind': '',
 \   'delete': [],
@@ -190,6 +185,20 @@ function! s:undoablecount() abort
 endfunction
 
 
+if exists('*diff')
+  function! s:diff(before, after) abort
+    return diff(a:before, a:after, {'output': 'indices'})
+  endfunction
+else
+  function! s:diff(before, after) abort
+    let diffoutput = s:calldiff(a:before, a:after)
+    return copy(diffoutput)
+    \ ->filter({-> v:val =~# '\m^\(\d\+\%(,\d\+\)\?\)\([acd]\)\(\d\+\%(,\d\+\)\?\)'})
+    \ ->map({-> s:diffheader2dict(v:val)})
+  endfunction
+endif
+
+
 function! s:calldiff(before, after) abort
   if s:TEMPBEFORE ==# ''
     let s:TEMPBEFORE = tempname()
@@ -221,14 +230,6 @@ function! s:system(cmd) abort
     sleep 1m
   endwhile
   return out
-endfunction
-
-
-function! s:diff(before, after) abort
-  let diffoutput = s:calldiff(a:before, a:after)
-  return copy(diffoutput)
-  \ ->filter({-> v:val =~# '\m^\(\d\+\%(,\d\+\)\?\)\([acd]\)\(\d\+\%(,\d\+\)\?\)'})
-  \ ->map({-> s:diffheader2dict(v:val)})
 endfunction
 
 
@@ -482,6 +483,12 @@ function! s:glow(difflist, duration) abort
   call h.show()
   call h.quench_timer(a:duration)
   call add(s:highlights, h)
+endfunction
+
+
+" for debug
+function! highlightedundo#dumptree(filename) abort
+  call writefile([string(undotree())], a:filename)
 endfunction
 
 
