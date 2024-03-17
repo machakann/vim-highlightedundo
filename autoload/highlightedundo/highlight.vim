@@ -129,7 +129,7 @@ function! s:set_autocmds(id) abort
     " execute printf('autocmd TextChanged <buffer> call s:cancel_highlight(%s)', a:id)
     execute printf('autocmd InsertEnter <buffer> call s:cancel_highlight(%s)', a:id)
     execute printf('autocmd BufUnload <buffer> call s:cancel_highlight(%s)', a:id)
-    execute printf('autocmd BufEnter * call s:switch_highlight(%s)', a:id)
+    execute printf('autocmd BufLeave <buffer> call s:cancel_highlight(%s)', a:id)
   augroup END
 endfunction
 
@@ -145,18 +145,6 @@ function! s:cancel_highlight(id) abort
   let highlight = s:quench_table[a:id]
   if highlight != {}
     call highlight.quench()
-  endif
-endfunction
-
-
-function! s:switch_highlight(id) abort
-  let highlight = s:quench_table[a:id]
-  if highlight != {} && highlight.winid == win_getid()
-    if highlight.bufnr == bufnr('%')
-      call highlight.show()
-    else
-      call highlight.quench()
-    endif
   endif
 endfunction
 
