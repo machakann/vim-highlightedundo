@@ -1,8 +1,5 @@
 " clock object - measuring elapsed time in a operation
 
-let s:has_reltime_and_float = has('reltime') && has('float')
-
-
 let s:clock = {
       \   'started' : 0,
       \   'paused'  : 0,
@@ -22,10 +19,8 @@ function! s:clock.start() dict abort
       let self.paused = 0
     endif
   else
-    if s:has_reltime_and_float
-      let self.zerotime = reltime()
-      let self.started  = 1
-    endif
+    let self.zerotime = reltime()
+    let self.started  = 1
   endif
 endfunction
 

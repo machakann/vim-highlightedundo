@@ -2,9 +2,6 @@
 let s:save_cpo = &cpoptions
 set cpoptions&vim
 
-let s:FALSE = 0
-let s:TRUE = 1
-
 function! highlightedundo#chardiff#diff(before, after, ...) abort
   if a:before ==# a:after
     return []
@@ -198,5 +195,4 @@ endfunction
 let &cpoptions = s:save_cpo
 unlet s:save_cpo
 
-" vim:set commentstring="%s:
 " vim:set ts=2 sts=2 sw=2:

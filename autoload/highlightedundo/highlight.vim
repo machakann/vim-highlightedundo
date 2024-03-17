@@ -3,23 +3,9 @@
 let s:save_cpo = &cpoptions
 set cpoptions&vim
 
-let s:null_pos = [0, 0, 0, 0]
-
-let s:on = 1
-let s:off = 0
-let s:maxcol = 2147483647
-
-let s:type_list = type([])
-
-if v:version > 704 || (v:version == 704 && has('patch237'))
-  let s:has_patch_7_4_362 = has('patch-7.4.362')
-  let s:has_patch_7_4_392 = has('patch-7.4.392')
-else
-  let s:has_patch_7_4_362 = v:version == 704 && has('patch362')
-  let s:has_patch_7_4_392 = v:version == 704 && has('patch392')
-endif
-
-let s:has_gui_running = has('gui_running')
+let s:ON = 1
+let s:OFF = 0
+let s:GUI_RUNNING = has('gui_running')
 
 " SID
 function! s:SID() abort
@@ -29,21 +15,18 @@ let s:SID = printf("\<SNR>%s_", s:SID())
 delfunction s:SID
 
 
-function! highlightedundo#highlight#new() abort
-  return deepcopy(s:highlight)
-endfunction
-
-let s:quench_table = {}
-
-
 let s:highlight = {
-      \   'status': s:off,
+      \   'status': s:OFF,
       \   'id': [],
       \   'order_list': [],
       \   'bufnr': 0,
       \   'winid': 0,
       \   'timer_id': 0,
       \ }
+function! highlightedundo#highlight#new() abort
+  return deepcopy(s:highlight)
+endfunction
+
 
 function! s:highlight.add(hi_group, order) abort
   call add(self.order_list, [a:hi_group, a:order])
@@ -54,7 +37,7 @@ function! s:highlight.show() dict abort
   if empty(self.order_list)
     return 0
   endif
-  if self.status is s:on
+  if self.status is s:ON
     call self.quench()
   endif
 
@@ -62,7 +45,7 @@ function! s:highlight.show() dict abort
     let self.id += [matchaddpos(hi_group, [order])]
   endfor
   call filter(self.id, 'v:val > 0')
-  let self.status = s:on
+  let self.status = s:ON
   let self.bufnr = bufnr('%')
   let self.winid = win_getid()
   return 1
@@ -85,7 +68,7 @@ endfunction
 
 
 function! s:highlight._quench() abort
-  if self.status is s:off
+  if self.status is s:OFF
     return
   endif
 
@@ -95,7 +78,7 @@ function! s:highlight._quench() abort
     call s:matchdelete_all(self.id)
     let succeeded = 1
   else
-    if s:is_in_cmdline_window()
+    if getcmdwintype() !=# ''
       augroup highlightedundo-pause-quenching
         autocmd!
         execute printf("autocmd CmdWinLeave * call s:after_CmdWinLeave(%d)", self.timer_id)
@@ -115,12 +98,13 @@ function! s:highlight._quench() abort
   endif
 
   if succeeded
-    let self.status = s:off
+    let self.status = s:OFF
   endif
   return
 endfunction
 
 
+let s:quench_table = {}
 function! s:highlight.quench_timer(time) dict abort
   let id = timer_start(a:time, self.quench)
   let s:quench_table[id] = self
@@ -203,32 +187,12 @@ function! s:matchdelete_all(ids) abort
 endfunction
 
 
-" function! s:is_in_cmdline_window() abort
-if s:has_patch_7_4_392
-  function! s:is_in_cmdline_window() abort
-    return getcmdwintype() !=# ''
-  endfunction
-else
-  function! s:is_in_cmdline_window() abort
-    let is_in_cmdline_window = 0
-    try
-      execute 'tabnext ' . tabpagenr()
-    catch /^Vim\%((\a\+)\)\=:E11/
-      let is_in_cmdline_window = 1
-    catch
-    finally
-      return is_in_cmdline_window
-    endtry
-  endfunction
-endif
-
-
 function! s:shift_options() abort
   let options = {}
 
   """ tweak appearance
   " hide_cursor
-  if s:has_gui_running
+  if s:GUI_RUNNING
     let options.cursor = &guicursor
     set guicursor+=a:block-NONE
   else
@@ -241,7 +205,7 @@ endfunction
 
 
 function! s:restore_options(options) abort
-  if s:has_gui_running
+  if s:GUI_RUNNING
     set guicursor&
     let &guicursor = a:options.cursor
   else

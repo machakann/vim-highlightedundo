@@ -10,8 +10,6 @@ let s:TEMPBEFORE = ''
 let s:TEMPAFTER = ''
 let s:GUI_RUNNING = has('gui_running')
 
-let s:highlights = []
-
 
 function! highlightedundo#undo() abort
   let [n, _] = s:undoablecount()
@@ -412,6 +410,7 @@ function! s:search_correspondence(before, after, hunk) abort
 endfunction
 
 
+let s:highlights = []
 function! s:quench_highlight() abort
   for h in s:highlights
     call h.quench()
