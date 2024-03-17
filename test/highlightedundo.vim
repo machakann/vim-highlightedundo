@@ -2,6 +2,10 @@ let s:suite = themis#suite('highlightedundo: ')
 let s:scope = themis#helper('scope')
 let s:highlightedundo = s:scope.funcs('autoload/highlightedundo.vim')
 
+if v:version > 900
+  import '../autoload/highlightedundo/chardiff/chardiff_vim9.vim' as chardiff
+endif
+
 
 function! s:suite.before_each() abort "{{{
   new
@@ -22,6 +26,97 @@ function! s:all(bools) abort "{{{
 endfunction "}}}
 
 
+function! s:test_chardiff(chardiff) abort "{{{
+  call g:assert.equals(
+  \ a:chardiff('abc', 'abc'),
+  \ [], '#1')
+
+  call g:assert.equals(a:chardiff('abc', 'uabc'),
+  \ [[[1, 0], [1, 1]]], '#2')
+
+  call g:assert.equals(a:chardiff('abc', 'uuuabc'),
+  \ [[[1, 0], [1, 3]]], '#3')
+
+  call g:assert.equals(a:chardiff('uabc', 'abc'),
+  \ [[[1, 1], [1, 0]]], '#4')
+
+  call g:assert.equals(a:chardiff('uuuabc', 'abc'),
+  \ [[[1, 3], [1, 0]]], '#5')
+
+  call g:assert.equals(a:chardiff('abc', 'uabcv'),
+  \ [[[1, 0], [1, 1]], [[4, 0], [5, 1]]], '#6')
+
+  call g:assert.equals(a:chardiff('abc', 'uuuabcvvv'),
+  \ [[[1, 0], [1, 3]], [[4, 0], [7, 3]]], '#7')
+
+  call g:assert.equals(a:chardiff('uabcv', 'abc'),
+  \ [[[1, 1], [1, 0]], [[5, 1], [4, 0]]], '#8')
+
+  call g:assert.equals(a:chardiff('uuuabcvvv', 'abc'),
+  \ [[[1, 3], [1, 0]], [[7, 3], [4, 0]]], '#9')
+
+  call g:assert.equals(a:chardiff('abc', 'uab'),
+  \ [[[1, 3], [1, 3]]], '#10')
+
+  call g:assert.equals(a:chardiff('abc', 'abv'),
+  \ [[[1, 3], [1, 3]]], '#11')
+
+  call g:assert.equals(a:chardiff('abc', 'uabv'),
+  \ [[[1, 3], [1, 4]]], '#12')
+
+  call g:assert.equals(a:chardiff('uabv', 'abc'),
+  \ [[[1, 4], [1, 3]]], '#13')
+
+  call g:assert.equals(a:chardiff('abcuuu', 'abcuuu'),
+  \ [], '#14')
+
+  call g:assert.equals(a:chardiff('abcuuuuuu', 'uuuuuu'),
+  \ [[[1, 3], [1, 0]]], '#15')
+
+  call g:assert.equals(a:chardiff('uuuuuu', 'abcuuuuuu'),
+  \ [[[1, 0], [1, 3]]], '#16')
+
+  call g:assert.equals(a:chardiff('uuuabcuuu', 'uuuuuu'),
+  \ [[[4, 3], [4, 0]]], '#17')
+
+  call g:assert.equals(a:chardiff('uuuuuu', 'uuuabcuuu'),
+  \ [[[4, 0], [4, 3]]], '#18')
+
+  call g:assert.equals(a:chardiff('abcuuu', 'abcvvv'),
+  \ [[[4, 3], [4, 3]]], '#19')
+
+  call g:assert.equals(a:chardiff('uuuabc', 'vvvabc'),
+  \ [[[1, 3], [1, 3]]], '#20')
+
+  call g:assert.equals(a:chardiff('uuuabcvvv', 'wwwabcxxx'),
+  \ [[[1, 3], [1, 3]], [[7, 3], [7, 3]]], '#21')
+
+  call g:assert.equals(a:chardiff('uuabcvvvv', 'vvvabcuuu'),
+  \ [[[1, 2], [1, 3]], [[6, 4], [7, 3]]], '#22')
+
+  " There are several interpretations for this problem,
+  " this might be flaky
+  call g:assert.equals(a:chardiff('uuabcvv', 'vvabcuu'),
+  \ [[[1, 2], [1, 2]], [[6, 2], [6, 2]]], '#23')
+
+  call g:assert.equals(a:chardiff('uuuuu', 'uuu'),
+  \ [[[4, 2], [4, 0]]], '#24')
+
+  call g:assert.equals(a:chardiff('foo(bar)', 'foo(qux)'),
+  \ [[[5, 3], [5, 3]]], '#25')
+
+  call g:assert.equals(a:chardiff('foo(bar(qux), baz)', 'foo(qux, baz)'),
+  \ [[[5, 4], [5, 0]], [[12, 1], [8, 0]]], '#26')
+
+  call g:assert.equals(a:chardiff('foo(qux, baz)', 'foo(bar(qux), baz)'),
+  \ [[[5, 0], [5, 4]], [[8, 0], [12, 1]]], '#27')
+
+  call g:assert.equals(a:chardiff('foo(bar(A), B)', 'foo(A, B)'),
+  \ [[[5, 6], [5, 1]]], '#28')
+
+  call g:assert.equals(a:chardiff('foobarbaz(qux), foobarbaz(corge)', 'qux, foobarbaz(corge)'),
+  \ [[[1, 10], [1, 0]], [[14, 1], [4, 0]]], '#29')
+endfunction "}}}
 function! s:test_undo_redo() abort "{{{
   normal! Afoo
   execute "normal! i\<C-g>u"
@@ -173,97 +268,15 @@ function! s:test_reset_undolebels() abort "{{{
 endfunction "}}}
 
 
-function! s:suite.chardiff() abort "{{{
-  call g:assert.equals(
-  \ highlightedundo#chardiff#diff('abc', 'abc'),
-  \ [], '#1')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uabc'),
-  \ [[[1, 0], [1, 1]]], '#2')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uuuabc'),
-  \ [[[1, 0], [1, 3]]], '#3')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uabc', 'abc'),
-  \ [[[1, 1], [1, 0]]], '#4')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uuuabc', 'abc'),
-  \ [[[1, 3], [1, 0]]], '#5')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uabcv'),
-  \ [[[1, 0], [1, 1]], [[4, 0], [5, 1]]], '#6')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uuuabcvvv'),
-  \ [[[1, 0], [1, 3]], [[4, 0], [7, 3]]], '#7')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uabcv', 'abc'),
-  \ [[[1, 1], [1, 0]], [[5, 1], [4, 0]]], '#8')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uuuabcvvv', 'abc'),
-  \ [[[1, 3], [1, 0]], [[7, 3], [4, 0]]], '#9')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uab'),
-  \ [[[1, 3], [1, 3]]], '#10')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'abv'),
-  \ [[[1, 3], [1, 3]]], '#11')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('abc', 'uabv'),
-  \ [[[1, 3], [1, 4]]], '#12')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uabv', 'abc'),
-  \ [[[1, 4], [1, 3]]], '#13')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('abcuuu', 'abcuuu'),
-  \ [], '#14')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('abcuuuuuu', 'uuuuuu'),
-  \ [[[1, 3], [1, 0]]], '#15')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uuuuuu', 'abcuuuuuu'),
-  \ [[[1, 0], [1, 3]]], '#16')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uuuabcuuu', 'uuuuuu'),
-  \ [[[4, 3], [4, 0]]], '#17')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uuuuuu', 'uuuabcuuu'),
-  \ [[[4, 0], [4, 3]]], '#18')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('abcuuu', 'abcvvv'),
-  \ [[[4, 3], [4, 3]]], '#19')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uuuabc', 'vvvabc'),
-  \ [[[1, 3], [1, 3]]], '#20')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uuuabcvvv', 'wwwabcxxx'),
-  \ [[[1, 3], [1, 3]], [[7, 3], [7, 3]]], '#21')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uuabcvvvv', 'vvvabcuuu'),
-  \ [[[1, 2], [1, 3]], [[6, 4], [7, 3]]], '#22')
-
-  " There are several interpretations for this problem,
-  " this might be flaky
-  call g:assert.equals(highlightedundo#chardiff#diff('uuabcvv', 'vvabcuu'),
-  \ [[[1, 2], [1, 2]], [[6, 2], [6, 2]]], '#23')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('uuuuu', 'uuu'),
-  \ [[[4, 2], [4, 0]]], '#24')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('foo(bar)', 'foo(qux)'),
-  \ [[[5, 3], [5, 3]]], '#25')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('foo(bar(qux), baz)', 'foo(qux, baz)'),
-  \ [[[5, 4], [5, 0]], [[12, 1], [8, 0]]], '#26')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('foo(qux, baz)', 'foo(bar(qux), baz)'),
-  \ [[[5, 0], [5, 4]], [[8, 0], [12, 1]]], '#27')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('foo(bar(A), B)', 'foo(A, B)'),
-  \ [[[5, 6], [5, 1]]], '#28')
-
-  call g:assert.equals(highlightedundo#chardiff#diff('foobarbaz(qux), foobarbaz(corge)', 'qux, foobarbaz(corge)'),
-  \ [[[1, 10], [1, 0]], [[14, 1], [4, 0]]], '#29')
+function! s:suite.chardiff_legacy() abort "{{{
+  let chardiff = highlightedundo#chardiff#chardiff_legacy#import()
+  call s:test_chardiff(chardiff.Diff)
 endfunction "}}}
+if v:version > 900
+  function! s:suite.chardiff_vim9() abort "{{{
+    call s:test_chardiff(s:chardiff.Diff)
+  endfunction "}}}
+endif
 function! s:suite.diff() abort "{{{
   let before = ['abc']
   let after = ['abc']
