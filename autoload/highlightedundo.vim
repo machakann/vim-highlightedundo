@@ -52,8 +52,8 @@ function! s:common(count, command, countercommand) abort
   let view = winsaveview()
   let countstr = a:count == 1 ? '' : string(a:count)
   let before = getline(1, '$')
-  let range_before = s:highlight_range(g:highlightedundo#highlight_extra_lines)
   execute 'silent noautocmd normal! ' . countstr . a:command
+  let cursor_to_be_highlighted = getpos('.')
   let after = getline(1, '$')
   let range_after = s:highlight_range(g:highlightedundo#highlight_extra_lines)
   try
@@ -62,6 +62,8 @@ function! s:common(count, command, countercommand) abort
     if a:countercommand !=# ''
       execute 'silent noautocmd normal! ' . countstr . a:countercommand
     endif
+    call setpos('.', cursor_to_be_highlighted)
+    let range_before = s:highlight_range(g:highlightedundo#highlight_extra_lines)
     call winrestview(view)
   endtry
   let difflist = s:parsediff(hunks, before, after, range_before, range_after)
@@ -69,6 +71,7 @@ function! s:common(count, command, countercommand) abort
   let originalcursor = s:hidecursor()
   try
     call s:quench_highlight()
+    call setpos('.', cursor_to_be_highlighted)
     call s:blink(difflist, g:highlightedundo#highlight_duration_delete)
     execute "silent normal! " . a:count . a:command
     call s:glow(difflist, g:highlightedundo#highlight_duration_add)
