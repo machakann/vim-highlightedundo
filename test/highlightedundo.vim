@@ -7,26 +7,23 @@ if v:version > 900
 endif
 
 
-function! s:suite.before_each() abort "{{{
+function! s:suite.before_each() abort
   new
   let g:highlightedundo#debounce = 1
 endfunction
-"}}}
-function! s:suite.after_each() abort "{{{
+
+
+function! s:suite.after_each() abort
   bwipeout!
-endfunction "}}}
-function! s:suite.after() abort "{{{
+endfunction
+
+
+function! s:suite.after() abort
   call s:suite.before_each()
 endfunction
-"}}}
 
 
-function! s:all(bools) abort "{{{
-  return filter(copy(a:bools), '!v:val') == []
-endfunction "}}}
-
-
-function! s:test_chardiff(chardiff) abort "{{{
+function! s:test_chardiff(chardiff) abort
   call g:assert.equals(
   \ a:chardiff('abc', 'abc'),
   \ [], '#1')
@@ -116,8 +113,10 @@ function! s:test_chardiff(chardiff) abort "{{{
 
   call g:assert.equals(a:chardiff('foobarbaz(qux), foobarbaz(corge)', 'qux, foobarbaz(corge)'),
   \ [[[1, 10], [1, 0]], [[14, 1], [4, 0]]], '#29')
-endfunction "}}}
-function! s:test_undo_redo() abort "{{{
+endfunction
+
+
+function! s:test_undo_redo() abort
   normal! Afoo
   execute "normal! i\<C-g>u"
   normal u
@@ -192,8 +191,10 @@ function! s:test_undo_redo() abort "{{{
   execute "normal 2\<C-r>"
   sleep 2m
   call g:assert.equals(getline('.'), 'foobaz', '#17')
-endfunction "}}}
-function! s:test_gplus_gminus() abort "{{{
+endfunction
+
+
+function! s:test_gplus_gminus() abort
   normal! Afoo
   execute "normal! i\<C-g>u"
   normal! Abar
@@ -250,8 +251,10 @@ function! s:test_gplus_gminus() abort "{{{
   normal 4g+
   sleep 2m
   call g:assert.equals(getline('.'), 'foobaz', '#12')
-endfunction "}}}
-function! s:test_reset_undolebels() abort "{{{
+endfunction
+
+
+function! s:test_reset_undolebels() abort
   normal! Afoo
   let old_undolevels = &undolevels
   set undolevels=-1
@@ -265,19 +268,25 @@ function! s:test_reset_undolebels() abort "{{{
   execute "normal \<C-r>"
   sleep 2m
   call g:assert.equals(getline('.'), 'foo', '#2')
-endfunction "}}}
+endfunction
 
 
-function! s:suite.chardiff_legacy() abort "{{{
+
+
+function! s:suite.chardiff_legacy() abort
   let chardiff = highlightedundo#chardiff#chardiff_legacy#import()
   call s:test_chardiff(chardiff.Diff)
-endfunction "}}}
+endfunction
+
+
 if v:version > 900
-  function! s:suite.chardiff_vim9() abort "{{{
+  function! s:suite.chardiff_vim9() abort
     call s:test_chardiff(s:chardiff.Diff)
-  endfunction "}}}
+  endfunction
 endif
-function! s:suite.diff() abort "{{{
+
+
+function! s:suite.diff() abort
   let before = ['abc']
   let after = ['abc']
   call g:assert.equals(
@@ -340,8 +349,10 @@ function! s:suite.diff() abort "{{{
   \ s:highlightedundo.diff(before, after),
   \ [{'from_idx': 1, 'from_count': 1, 'to_idx': 1, 'to_count': 1}],
   \ '#9')
-endfunction "}}}
-function! s:suite.parsediff() abort "{{{
+endfunction
+
+
+function! s:suite.parsediff() abort
   let before = ['abc']
   let after = ['abc']
   let hunks = s:highlightedundo.diff(before, after)
@@ -634,34 +645,43 @@ function! s:suite.parsediff() abort "{{{
   \ ['c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'd'], '#28')
   call g:assert.equals(highlight_lines_before, [1, 2, 3, 4, 5, 997, 998, 999, 1000, 1001], '#29')
   call g:assert.equals(highlight_lines_after, [1, 2, 3, 4, 5, 997, 998, 999, 1000], '#30')
-endfunction "}}}
+endfunction
 
 
-function! s:suite.undo_redo_1step() abort "{{{
+function! s:suite.undo_redo_1step() abort
   let g:highlightedundo#highlight_mode = 1
   call s:test_undo_redo()
-endfunction "}}}
-function! s:suite.gplus_gminus_1step() abort "{{{
+endfunction
+
+
+function! s:suite.gplus_gminus_1step() abort
   let g:highlightedundo#highlight_mode = 1
   call s:test_gplus_gminus()
-endfunction "}}}
-function! s:suite.reset_undolebels_1step() abort "{{{
+endfunction
+
+
+function! s:suite.reset_undolebels_1step() abort
   let g:highlightedundo#highlight_mode = 1
   call s:test_reset_undolebels()
-endfunction "}}}
-function! s:suite.undo_redo_2step() abort "{{{
+endfunction
+
+
+function! s:suite.undo_redo_2step() abort
   let g:highlightedundo#highlight_mode = 2
   call s:test_undo_redo()
-endfunction "}}}
-function! s:suite.gplus_gminus_2step() abort "{{{
+endfunction
+
+
+function! s:suite.gplus_gminus_2step() abort
   let g:highlightedundo#highlight_mode = 2
   call s:test_gplus_gminus()
-endfunction "}}}
-function! s:suite.reset_undolebels_2step() abort "{{{
+endfunction
+
+
+function! s:suite.reset_undolebels_2step() abort
   let g:highlightedundo#highlight_mode = 2
   call s:test_reset_undolebels()
-endfunction "}}}
+endfunction
 
-" vim:set foldmethod=marker:
-" vim:set commentstring="%s:
+
 " vim:set ts=2 sts=2 sw=2:

@@ -47,7 +47,7 @@ endfunction
 
 let s:command = ''
 let s:timer = -1
-function! s:debounce(count, command, countercommand) abort "{{{
+function! s:debounce(count, command, countercommand) abort
   if s:timer != -1
     execute "normal! " . s:command
     call timer_stop(s:timer)
@@ -55,7 +55,7 @@ function! s:debounce(count, command, countercommand) abort "{{{
   let s:command = a:command
   let s:timer = timer_start(g:highlightedundo#debounce,
   \ {-> s:common(a:count, a:command, a:countercommand)})
-endfunction "}}}
+endfunction
 
 
 function! s:common(count, command, countercommand) abort
