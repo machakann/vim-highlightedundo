@@ -2,10 +2,6 @@ let s:suite = themis#suite('highlightedundo: ')
 let s:scope = themis#helper('scope')
 let s:highlightedundo = s:scope.funcs('autoload/highlightedundo.vim')
 
-if v:version > 900
-  import '../autoload/highlightedundo/chardiff/chardiff_vim9.vim' as chardiff
-endif
-
 
 function! s:suite.before_each() abort
   new
@@ -113,6 +109,21 @@ function! s:test_chardiff(chardiff) abort
 
   call g:assert.equals(a:chardiff('foobarbaz(qux), foobarbaz(corge)', 'qux, foobarbaz(corge)'),
   \ [[[1, 10], [1, 0]], [[14, 1], [4, 0]]], '#29')
+
+  call g:assert.equals(a:chardiff(repeat('a', 256), repeat('a', 256) . 'b'),
+  \ [[[1, 256], [1, 257]]], '#30')
+
+  call g:assert.equals(a:chardiff(repeat('a', 257), 'bb'),
+  \ [[[1, 257], [1, 2]]], '#31')
+
+  call g:assert.equals(a:chardiff(repeat('a', 256), repeat('b', 256) . 'c'),
+  \ [[[1, 256], [1, 256]], [[257, 0], [257, 1]]], '#32')
+
+  call g:assert.equals(a:chardiff(repeat('a', 256) . 'c', repeat('b', 256)),
+  \ [[[1, 256], [1, 256]], [[257, 1], [257, 0]]], '#33')
+
+  call g:assert.equals(a:chardiff(repeat('a', 256) . 'c', repeat('b', 256) . 'd'),
+  \ [[[1, 256], [1, 256]], [[257, 1], [257, 1]]], '#34')
 endfunction
 
 
@@ -280,6 +291,7 @@ endfunction
 
 
 if v:version > 900
+  import '../autoload/highlightedundo/chardiff/chardiff_vim9.vim' as chardiff
   function! s:suite.chardiff_vim9() abort
     call s:test_chardiff(s:chardiff.Diff)
   endfunction

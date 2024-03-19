@@ -5,23 +5,27 @@ export def Diff(before: string, after: string, limit=255): list<list<list<number
   if before ==# after
     return []
   endif
-  var difflist = DiffImpl(before[: limit], after[: limit])
+  if before[: limit] ==# after[: limit]
+    # There is a difference after `limit` bytes.
+    return [[[1, strlen(before)], [1, strlen(after)]]]
+  endif
+  var changelist = DiffImpl(before, after, limit)
   # Convert charidx to byteidx
-  map(difflist, (k, v): list<list<number>> => [Byteidx(v[0], before), Byteidx(v[1], after)])
-  return difflist
+  map(changelist, (k, v): list<list<number>> => [Byteidx(v[0], before), Byteidx(v[1], after)])
+  return changelist
 enddef
 
 
-def Byteidx(diff: list<number>, str: string): list<number>
-  const idx = diff[0] - 1
-  const len = diff[1]
+def Byteidx(order: list<number>, str: string): list<number>
+  const idx = order[0] - 1
+  const len = order[1]
   const byte_idx = byteidx(str, idx)
   const byte_len = byteidx(str, idx + len) - byte_idx
   return [byte_idx + 1, byte_len]
 enddef
 
 
-def DiffImpl(before: string, after: string): list<list<list<number>>>
+def DiffImpl(before: string, after: string, limit: number): list<list<list<number>>>
   const beforelen = strchars(before)
   const afterlen = strchars(after)
   if before ==# after
@@ -29,9 +33,9 @@ def DiffImpl(before: string, after: string): list<list<list<number>>>
   endif
   const chunklen = 3
   if min([beforelen, afterlen]) <= chunklen
-    return CompareShort(before, after, beforelen, afterlen)
+    return CompareShort(before, after)
   endif
-  return Compare(before, after, beforelen, afterlen, chunklen)
+  return Compare(before, after, limit, chunklen)
 enddef
 
 
@@ -50,15 +54,17 @@ export def Similarity(before: string, after: string): float
 enddef
 
 
-def CompareShort(str1: string, str2: string, len1: number, len2: number): list<list<list<number>>>
-  if len1 <= len2
-    return CompareShortImpl(str1, str2, len1, len2)
+def CompareShort(str1: string, str2: string): list<list<list<number>>>
+  if strchars(str1) <= strchars(str2)
+    return CompareShortImpl(str1, str2)
   endif
-  return map(CompareShortImpl(str2, str1, len2, len1), 'reverse(v:val)')
+  return map(CompareShortImpl(str2, str1), 'reverse(v:val)')
 enddef
 
 
-def CompareShortImpl(short: string, long: string, shortlen: number, longlen: number): list<list<list<number>>>
+def CompareShortImpl(short: string, long: string): list<list<list<number>>>
+  const shortlen = strchars(short)
+  const longlen = strchars(long)
   const shortexpr = ToExpr(short)
   const i = Charmatch(long, shortexpr)
   if i < 0
@@ -81,37 +87,56 @@ def CompareShortImpl(short: string, long: string, shortlen: number, longlen: num
 enddef
 
 
-def Compare(A: string, B: string, Alen: number, Blen: number, chunklen: number): list<list<list<number>>>
-  if A ==# B
-    return []
-  endif
-
-  const loffset = CountCoincidence(A, B, 0, 0)
+def Compare(before_orig: string, after_orig: string, limit: number,
+            chunklen: number): list<list<list<number>>>
+  var before = before_orig[: limit]
+  var after = after_orig[: limit]
+  # NOTE: beforelen != strchars(before_orig) and
+  #       afterlen != strchars(after_orig) in this func
+  const beforelen = strchars(before)
+  const afterlen = strchars(after)
+  const loffset = CountCoincidence(before, after, 0, 0)
   const i = loffset
   const j = loffset
-  if i == Alen
-    return [[[loffset + 1, 0], [loffset + 1, Blen - loffset]]]
-  elseif j == Blen
-    return [[[loffset + 1, Alen - loffset], [loffset + 1, 0]]]
+  if i == beforelen
+    const original_after_len = strchars(after_orig)
+    return [[[loffset + 1, 0], [loffset + 1, original_after_len - loffset]]]
+  elseif j == afterlen
+    const original_before_len = strchars(before_orig)
+    return [[[loffset + 1, original_before_len - loffset], [loffset + 1, 0]]]
   endif
 
   const roffset = min([
-    CountCoincidence(reverse(A), reverse(B), 0, 0),
-    Alen - loffset,
-    Blen - loffset,
+    CountCoincidence(reverse(before), reverse(after), 0, 0),
+    beforelen - loffset,
+    afterlen - loffset,
   ])
-  const imax = Alen - roffset
-  const jmax = Blen - roffset
+  const imax = beforelen - roffset
+  const jmax = afterlen - roffset
+  final changelist: list<list<list<number>>> = []
   if i == imax
-    return [[[loffset + 1, 0], [loffset + 1, Blen - loffset - roffset]]]
+    add(changelist, [[loffset + 1, 0], [loffset + 1, afterlen - loffset - roffset]])
   elseif j == jmax
-    return [[[loffset + 1, Alen - loffset - roffset], [loffset + 1, 0]]]
+    add(changelist, [[loffset + 1, beforelen - loffset - roffset], [loffset + 1, 0]])
+  else
+    const d = CompareImpl(before[: imax - 1], after[: jmax - 1], chunklen, i, j, imax, jmax)
+    extend(changelist, d)
   endif
-  return CompareImpl(A[: imax - 1], B[: jmax - 1], chunklen, i, j, imax, jmax)
+
+  const before_rest = before_orig[limit + 1 :]
+  const after_rest = after_orig[limit + 1 :]
+  if before_rest ==# '' && after_rest !=# ''
+    add(changelist, [[limit + 2, 0], [limit + 2, strchars(after_rest)]])
+  elseif before_rest !=# '' && after_rest ==# ''
+    add(changelist, [[limit + 2, strchars(before_rest)], [limit + 2, 0]])
+  elseif before_rest !=# '' && after_rest !=# ''
+    add(changelist, [[limit + 2, strchars(before_rest)], [limit + 2, strchars(after_rest)]])
+  endif
+  return changelist
 enddef
 
 
-def CompareImpl(A: string, B: string, chunklen: number, i0: number, j0: number,
+def CompareImpl(before: string, after: string, chunklen: number, i0: number, j0: number,
                 imax: number, jmax: number): list<list<list<number>>>
   var i = i0
   var j = j0
@@ -120,20 +145,20 @@ def CompareImpl(A: string, B: string, chunklen: number, i0: number, j0: number,
   final result: list<list<list<number>>> = []
   while loop < loopmax
     loop += 1
-    var [ii, jj, k] = ChunkMatch(A, B, chunklen, i, j)
+    var [ii, jj, k] = ChunkMatch(before, after, chunklen, i, j)
     if jj < 0
       # No match
-      call add(result, [[i + 1, imax - i], [j + 1, jmax - j]])
+      add(result, [[i + 1, imax - i], [j + 1, jmax - j]])
       break
     elseif jj == j
       if ii > i
-        call add(result, [[i + 1, ii - i], [j + 1, 0]])
+        add(result, [[i + 1, ii - i], [j + 1, 0]])
       endif
     else
       if ii > i
-        call add(result, [[i + 1, ii - i], [j + 1, jj - j]])
+        add(result, [[i + 1, ii - i], [j + 1, jj - j]])
       else
-        call add(result, [[i + 1, 0], [j + 1, jj - j]])
+        add(result, [[i + 1, 0], [j + 1, jj - j]])
       endif
     endif
     i = ii + k
@@ -142,7 +167,7 @@ def CompareImpl(A: string, B: string, chunklen: number, i0: number, j0: number,
       var del = [i + 1, max([imax - i, 0])]
       var add = [j + 1, max([jmax - j, 0])]
       if add[1] > 0 || del[1] > 0
-        call add(result, [del, add])
+        add(result, [del, add])
       endif
       break
     endif
@@ -163,9 +188,7 @@ def ChunkMatch(A: string, B: string, chunklen: number, i0: number, j0: number): 
   var k = 0
   var slip = chunklen * 3
   for ii in range(i0, Alen - chunklen)
-    var start = ii
-    var end = ii + chunklen - 1
-    var chunk = A[start : end]
+    var chunk = strpart(A, ii, chunklen)
     var chunkexpr = ToExpr(chunk)
     var jj = Charmatch(B, chunkexpr, j0)
     if jj >= 0
