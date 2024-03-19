@@ -5,7 +5,19 @@ export def Diff(before: string, after: string, limit=255): list<list<list<number
   if before ==# after
     return []
   endif
-  return DiffImpl(before[: limit], after[: limit])
+  var difflist = DiffImpl(before[: limit], after[: limit])
+  # Convert charidx to byteidx
+  map(difflist, (k, v): list<list<number>> => [Byteidx(v[0], before), Byteidx(v[1], after)])
+  return difflist
+enddef
+
+
+def Byteidx(diff: list<number>, str: string): list<number>
+  const idx = diff[0] - 1
+  const len = diff[1]
+  const byte_idx = byteidx(str, idx)
+  const byte_len = byteidx(str, idx + len) - byte_idx
+  return [byte_idx + 1, byte_len]
 enddef
 
 
@@ -48,7 +60,7 @@ enddef
 
 def CompareShortImpl(short: string, long: string, shortlen: number, longlen: number): list<list<list<number>>>
   const shortexpr = ToExpr(short)
-  const i = match(long, shortexpr)
+  const i = Charmatch(long, shortexpr)
   if i < 0
     # abc, abde
     return [[[1, shortlen], [1, longlen]]]
@@ -155,7 +167,7 @@ def ChunkMatch(A: string, B: string, chunklen: number, i0: number, j0: number): 
     var end = ii + chunklen - 1
     var chunk = A[start : end]
     var chunkexpr = ToExpr(chunk)
-    var jj = match(B, chunkexpr, j0)
+    var jj = Charmatch(B, chunkexpr, j0)
     if jj >= 0
       var kk = CountCoincidence(A, B, ii, jj)
       if kk > k
@@ -173,6 +185,11 @@ enddef
 
 def ToExpr(str: string): string
   return '\C' .. escape(str, '~"\.^$[]*')
+enddef
+
+
+def Charmatch(str: string, expr: string, start: number = 0): number
+  return charidx(str, match(str, expr, byteidx(str, start)))
 enddef
 
 
