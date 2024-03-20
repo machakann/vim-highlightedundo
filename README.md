@@ -3,9 +3,14 @@ Make the undo region apparent!
 
 ## Dependency
 
-Vim 8.1+
+- Vim 8.1+
+- `+reltime`
+- `+float`
+- `+timers`
+- `+job`
 
-`diff` command (https://www.gnu.org/software/diffutils/) is required to use this plugin.
+If you are using a Vim earlier than 9.1.0071, this plugin needs an external diff command to work.
+- `diff` command (https://www.gnu.org/software/diffutils/)
 
 ```vim
 " should be 1

@@ -1,5 +1,5 @@
 *highlightedundo.txt*	Make the undo region apparent!
-						Last change:17-Mar-2024.
+						Last change:20-Mar-2024.
 
 Author  : machakann <https://github.com/machakann>
 License : NYSL license
@@ -7,11 +7,14 @@ License : NYSL license
           English (Unofficial) <http://www.kmonos.net/nysl/index.en.html>
 
 Requirement:	Vim 8.1 or higher
-		|+reltime| feature
-		|+float| feature
-		|+timers| feature
-		|+job| feature
-		diff command <https://www.gnu.org/software/diffutils/>
+		  * |+reltime| feature
+		  * |+float| feature
+		  * |+timers| feature
+		  * |+job| feature
+
+		If you are using a Vim earlier than 9.1.0071, this plugin
+		needs an external diff command to work.
+		  * diff command <https://www.gnu.org/software/diffutils/>
 ==============================================================================
 INDEX					*highlightedundo-index*
 
