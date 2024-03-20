@@ -601,14 +601,18 @@ function! s:suite.parsediff() abort
   let after = repeat(['foo bar qux'], 1000)
   let hunks = s:highlightedundo.diff(before, after)
   let result = s:highlightedundo.parsediff(hunks, before, after, [995, 999], [0, 4])
-  let diff_kind  = copy(result)
-                 \->map('v:val["kind"]')
+
+  let diff_kind = copy(result)
+  call map(diff_kind, 'v:val["kind"]')
+
   let highlight_lines_before = copy(result)
-                             \->map('v:val["delete"]')
-                             \->map('v:val[0]')
-  let highlight_lines_after  = copy(result)
-                             \->map('v:val["add"]')
-                             \->map('v:val[0]')
+  call map(highlight_lines_before, 'v:val["delete"]')
+  call map(highlight_lines_before, 'v:val[0]')
+
+  let highlight_lines_after = copy(result)
+  call map(highlight_lines_after, 'v:val["add"]')
+  call map(highlight_lines_after, 'v:val[0]')
+
   call g:assert.equals(diff_kind,
   \ ['c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], '#22')
   call g:assert.equals(highlight_lines_before,
@@ -622,16 +626,20 @@ function! s:suite.parsediff() abort
   let after = repeat(['foo bar qux'], 1000)
   let hunks = s:highlightedundo.diff(before, after)
   let result = s:highlightedundo.parsediff(hunks, before, after, [0, 5], [995, 999])
-  let diff_kind  = copy(result)
-                \->map('v:val["kind"]')
+
+  let diff_kind = copy(result)
+  call map(diff_kind, 'v:val["kind"]')
+
   let highlight_lines_before = copy(result)
-                            \->map('v:val["delete"]')
-                            \->filter('v:val != []')
-                            \->map('v:val[0]')
-  let highlight_lines_after  = copy(result)
-                            \->map('v:val["add"]')
-                            \->filter('v:val != []')
-                            \->map('v:val[0]')
+  call map(highlight_lines_before, 'v:val["delete"]')
+  call filter(highlight_lines_before, 'v:val != []')
+  call map(highlight_lines_before, 'v:val[0]')
+
+  let highlight_lines_after = copy(result)
+  call map(highlight_lines_after, 'v:val["add"]')
+  call filter(highlight_lines_after, 'v:val != []')
+  call map(highlight_lines_after, 'v:val[0]')
+
   call g:assert.equals(diff_kind,
   \ ['d', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c'], '#25')
   call g:assert.equals(highlight_lines_before, [1, 2, 3, 4, 5, 6, 997, 998, 999, 1000, 1001], '#26')
@@ -643,16 +651,18 @@ function! s:suite.parsediff() abort
   let after = repeat(['foo bar qux'], 1000)
   let hunks = s:highlightedundo.diff(before, after)
   let result = s:highlightedundo.parsediff(hunks, before, after, [996, 1000], [0, 4])
-  let diff_kind  = copy(result)
-                 \->map('v:val["kind"]')
+  let diff_kind  = map(copy(result), 'v:val["kind"]')
+
   let highlight_lines_before = copy(result)
-                             \->map('v:val["delete"]')
-                             \->filter('v:val != []')
-                             \->map('v:val[0]')
-  let highlight_lines_after  = copy(result)
-                             \->map('v:val["add"]')
-                             \->filter('v:val != []')
-                             \->map('v:val[0]')
+  call map(highlight_lines_before, 'v:val["delete"]')
+  call filter(highlight_lines_before, 'v:val != []')
+  call map(highlight_lines_before, 'v:val[0]')
+
+  let highlight_lines_after = copy(result)
+  call map(highlight_lines_after, 'v:val["add"]')
+  call filter(highlight_lines_after, 'v:val != []')
+  call map(highlight_lines_after, 'v:val[0]')
+
   call g:assert.equals(diff_kind,
   \ ['c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c', 'd'], '#28')
   call g:assert.equals(highlight_lines_before, [1, 2, 3, 4, 5, 997, 998, 999, 1000, 1001], '#29')
