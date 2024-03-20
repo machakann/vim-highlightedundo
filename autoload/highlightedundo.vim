@@ -4,61 +4,106 @@ set cpoptions&vim
 let g:highlightedundo#highlight_mode = get(g:, 'highlightedundo#highlight_mode', 1)
 let g:highlightedundo#highlight_duration_delete = get(g:, 'highlightedundo#highlight_duration_delete', 200)
 let g:highlightedundo#highlight_duration_add = get(g:, 'highlightedundo#highlight_duration_add', 500)
+let g:highlightedundo#highlight_extra_lines = get(g:, 'highlighbarundo#highlight_extra_lines', &lines)
+let g:highlightedundo#debounce = get(g:, 'highlightedundo#debounce', 60)
 
 let s:TEMPBEFORE = ''
 let s:TEMPAFTER = ''
 let s:GUI_RUNNING = has('gui_running')
 
-function! highlightedundo#undo() abort "{{{
+
+function! highlightedundo#undo() abort
   let [n, _] = s:undoablecount()
   let safecount = min([v:count1, n])
-  call s:common(safecount, 'u', "\<C-r>")
-endfunction "}}}
-function! highlightedundo#redo() abort "{{{
+  call s:debounce(safecount, 'u', "\<C-r>")
+endfunction
+
+
+function! highlightedundo#redo() abort
   let [_, n] = s:undoablecount()
   let safecount = min([v:count1, n])
-  call s:common(safecount, "\<C-r>", 'u')
-endfunction "}}}
-function! highlightedundo#Undo() abort "{{{
-  call s:common(1, 'U', 'U')
-endfunction "}}}
-function! highlightedundo#gminus() abort "{{{
+  call s:debounce(safecount, "\<C-r>", 'u')
+endfunction
+
+
+function! highlightedundo#Undo() abort
+  call s:debounce(1, 'U', 'U')
+endfunction
+
+
+function! highlightedundo#gminus() abort
   let undotree = undotree()
   let safecount = min([v:count1, undotree.seq_cur + 1])
-  call s:common(safecount, 'g-', 'g+')
-endfunction "}}}
-function! highlightedundo#gplus() abort "{{{
+  call s:debounce(safecount, 'g-', 'g+')
+endfunction
+
+
+function! highlightedundo#gplus() abort
   let undotree = undotree()
   let safecount = min([v:count1, undotree.seq_last - undotree.seq_cur])
-  call s:common(safecount, 'g+', 'g-')
-endfunction "}}}
-function! s:common(count, command, countercommand) abort "{{{
+  call s:debounce(safecount, 'g+', 'g-')
+endfunction
+
+
+let s:command = ''
+let s:timer = -1
+function! s:debounce(count, command, countercommand) abort
+  if s:timer != -1
+    execute "normal! " . s:command
+    call timer_stop(s:timer)
+  endif
+  let s:command = a:command
+  let s:timer = timer_start(g:highlightedundo#debounce,
+  \ {-> s:common(a:count, a:command, a:countercommand)})
+endfunction
+
+
+function! s:common(count, command, countercommand) abort
+  let s:timer = -1
   if a:count <= 0
     return
   endif
 
   let view = winsaveview()
+  let countstr = a:count == 1 ? '' : string(a:count)
+  let before = getline(1, '$')
+  execute 'silent noautocmd normal! ' . countstr . a:command
+  let cursor_to_be_highlighted = getpos('.')
+  let after = getline(1, '$')
+  let range_after = s:highlight_range(g:highlightedundo#highlight_extra_lines)
   try
-    let diffoutput = s:getdiff(a:count, a:command, a:countercommand)
-    let difflist = s:parsediff(diffoutput)
-  catch
-    execute "silent normal! " . a:count . a:command
-    return
+    let hunks = s:diff(before, after)
   finally
+    if a:countercommand !=# ''
+      execute 'silent noautocmd normal! ' . countstr . a:countercommand
+    endif
+    call setpos('.', cursor_to_be_highlighted)
+    let range_before = s:highlight_range(g:highlightedundo#highlight_extra_lines)
     call winrestview(view)
   endtry
+  let difflist = s:parsediff(hunks, before, after, range_before, range_after)
 
   let originalcursor = s:hidecursor()
   try
-    call highlightedundo#highlight#cancel()
+    call s:quench_highlight()
+    call setpos('.', cursor_to_be_highlighted)
     call s:blink(difflist, g:highlightedundo#highlight_duration_delete)
     execute "silent normal! " . a:count . a:command
     call s:glow(difflist, g:highlightedundo#highlight_duration_add)
   finally
     call s:restorecursor(originalcursor)
   endtry
-endfunction "}}}
-function! s:hidecursor() abort "{{{
+endfunction
+
+
+function! s:highlight_range(extra_lines) abort
+  let highlight_start_idx = max([1, line('w0') - a:extra_lines]) - 1
+  let highlight_end_idx = min([line('$'), line('w$') + a:extra_lines]) - 1
+  return [highlight_start_idx, highlight_end_idx]
+endfunction
+
+
+function! s:hidecursor() abort
   if s:GUI_RUNNING
     let cursor = &guicursor
     set guicursor+=n-o:block-NONE
@@ -67,134 +112,40 @@ function! s:hidecursor() abort "{{{
     set t_ve=
   endif
   return cursor
-endfunction "}}}
-function! s:restorecursor(originalcursor) abort "{{{
+endfunction
+
+
+function! s:restorecursor(originalcursor) abort
   if s:GUI_RUNNING
     set guicursor&
     let &guicursor = a:originalcursor
   else
     let &t_ve = a:originalcursor
   endif
-endfunction "}}}
+endfunction
 
-" for debug
-function! highlightedundo#dumptree(filename) abort "{{{
-  call writefile([string(undotree())], a:filename)
-endfunction "}}}
 
-" Region class "{{{
-let s:region = {
-  \   '__class__': 'Region',
-  \   'head': [0, 0, 0, 0],
-  \   'tail': [0, 0, 0, 0],
-  \   'wise': 'v'
-  \ }
-function! s:Region(head, tail, wise) abort
-  let region = deepcopy(s:region)
-  let region.head = a:head
-  let region.tail = a:tail
-  let region.wise = a:wise
-  return region
-endfunction "}}}
-" Subdiff class "{{{
-let s:subdiff = {
-  \   '__class__': 'Subdiff',
-  \   'region': deepcopy(s:region),
-  \   'lines': [],
-  \ }
-function! s:Subdiff(head, tail, type, lines) abort
-  let subdiff = deepcopy(s:subdiff)
-  let subdiff.region = s:Region(a:head, a:tail, a:type)
-  let subdiff.lines = a:lines
-  return subdiff
-endfunction "}}}
-" Diff class "{{{
-let s:diff = {
-  \   '__class__': 'Diff',
-  \   'kind': '',
-  \   'add': [],
-  \   'delete': [],
-  \ }
-function! s:Diff(kind, from, to, lines) abort
-  let diff = deepcopy(s:diff)
+let s:Diff = {
+\   'kind': '',
+\   'delete': [],
+\   'add': [],
+\ }
+function! s:Diff(kind, list1, ...) abort
+  let diff = copy(s:Diff)
   let diff.kind = a:kind
-  if a:kind ==# 'a'
-    let addsubdiff = s:subdifflist_add(a:to[0], a:to[1], a:lines.add)
-    call add(diff.add, addsubdiff)
-  elseif a:kind ==# 'd'
-    let delsubdiff = s:subdifflist_delete(a:from[0], a:from[1], a:lines.delete)
-    call add(diff.delete, delsubdiff)
-  elseif a:kind ==# 'c'
-    let fromlinenrlist = range(a:from[0], a:from[1])
-    let tolinenrlist = range(a:to[0], a:to[1])
-    " XXX: To make it faster, restrict max 100 diff changes.
-    for i in range(min([max([len(fromlinenrlist), len(tolinenrlist)]), 100]))
-      if i < len(fromlinenrlist) && i < len(tolinenrlist)
-        let before = a:lines.delete[i]
-        let after = a:lines.add[i]
-        let fromlinenr = fromlinenrlist[i]
-        let tolinenr = tolinenrlist[i]
-        let [delsubdiffs, addsubdiffs] = s:subdifflist_change(fromlinenr, tolinenr, before, after)
-        call extend(diff.delete, delsubdiffs)
-        call extend(diff.add, addsubdiffs)
-      elseif i < len(fromlinenrlist)
-        let before = a:lines.delete[i]
-        let linenr = fromlinenrlist[i]
-        let delsubdiff = s:subdifflist_delete(linenr, linenr, [before])
-        call add(diff.delete, delsubdiff)
-      elseif i < len(tolinenrlist)
-        let after = a:lines.add[i]
-        let linenr = tolinenrlist[i]
-        let addsubdiff = s:subdifflist_add(linenr, linenr, [after])
-        call add(diff.add, addsubdiff)
-      endif
-    endfor
+  if a:kind is# 'a'
+    let diff.add = copy(a:list1)
+  elseif a:kind is# 'd'
+    let diff.delete = copy(a:list1)
+  else
+    let diff.delete = copy(a:list1)
+    let diff.add = copy(a:1)
   endif
   return diff
 endfunction
-function! s:subdifflist_delete(startline, endline, lines) abort "{{{
-  let head = [0, a:startline, 1, 0]
-  let tail = [0, a:endline, strlen(a:lines[-1]), 0]
-  let subdiff = s:Subdiff(head, tail, 'V', a:lines)
-  return subdiff
-endfunction "}}}
-function! s:subdifflist_add(startline, endline, lines) abort "{{{
-  let head = [0, a:startline, 1, 0]
-  let tail = [0, a:endline, strlen(a:lines[-1]), 0]
-  let subdiff = s:Subdiff(head, tail, 'V', a:lines)
-  return subdiff
-endfunction "}}}
-function! s:subdifflist_change(fromlinenr, tolinenr, before, after) abort "{{{
-  let [changedbefore, changedafter] = s:getchanged(a:before, a:after)
-  let [beforeindexes, afterindexes] = s:longestcommonsubsequence(
-                                    \ changedbefore[0], changedafter[0])
-  let delsubdiffs = s:splitchange(a:fromlinenr, changedbefore, beforeindexes)
-  let addsubdiffs = s:splitchange(a:tolinenr, changedafter, afterindexes)
-  return [delsubdiffs, addsubdiffs]
-endfunction "}}}
-"}}}
-function! s:escape(string) abort  "{{{
-  return escape(a:string, '~"\.^$[]*')
-endfunction "}}}
-" function! s:system(cmd) abort "{{{
-if exists('*job_start')
-  " NOTE: Arigatele...
-  "       https://gist.github.com/mattn/566ba5fff15f947730f9c149e74f0eda
-  function! s:system(cmd) abort
-    let out = ''
-    let job = job_start(a:cmd, {'out_cb': {ch,msg -> [execute('let out .= msg'), out]}, 'out_mode': 'raw'})
-    while job_status(job) ==# 'run'
-      sleep 1m
-    endwhile
-    return out
-  endfunction
-else
-  function! s:system(cmd) abort
-    return system(a:cmd)
-  endfunction
-endif
-"}}}
-function! s:undoablecount() abort "{{{
+
+
+function! s:undoablecount() abort
   let undotree = undotree()
   if undotree.entries == []
     return [0, 0]
@@ -205,8 +156,7 @@ function! s:undoablecount() abort "{{{
     return [undocount, redocount]
   endif
 
-  " get *correct* seq_cur
-  let seq_cur = s:get_seq_of_curhead_parent(undotree)
+  let seq_cur = undotree.seq_cur
   if seq_cur == 0
     return [0, 1]
   elseif seq_cur == -1
@@ -247,145 +197,24 @@ function! s:undoablecount() abort "{{{
   let undocount = eval(join(parttree.pos, '+')) + 1
   let redocount = len(parttree.tree) - parttree.pos[-1] - 1
   return [undocount, redocount]
-endfunction "}}}
-function! s:get_seq_of_curhead_parent(undotree) abort "{{{
-  if a:undotree.entries == []
-    return -1
-  endif
-  let stack = []
-  let parttree = {}
-  let parttree.pos = [0]
-  let parttree.tree = a:undotree.entries
-  let node = {'seq': 0}
-  while 1
-    let parentnode = node
-    let node = parttree.tree[parttree.pos[-1]]
-    if has_key(node, 'curhead')
-      return parentnode.seq
-    endif
-    if has_key(node, 'alt')
-      let alttree = {}
-      let alttree.pos = parttree.pos + [0]
-      let alttree.tree = node.alt
-      call add(stack, alttree)
-    endif
-    let parentnodepos = parttree.pos
-    let parttree.pos[-1] += 1
-    if len(parttree.tree) <= parttree.pos[-1]
-      if empty(stack)
-        break
-      else
-        let parttree = remove(stack, -1)
-      endif
-    endif
-  endwhile
-  return -1
-endfunction "}}}
-function! s:getchanged(before, after) abort "{{{
-  if empty(a:before) || empty(a:after)
-    let changedbefore = [a:before, 0, strlen(a:before)]
-    let changedafter = [a:after, 0, strlen(a:after)]
-    return [changedbefore, changedafter]
-  endif
+endfunction
 
-  let headpat = printf('\m\C^\%%[%s]', substitute(escape(a:before, '~"\.^$*'), '\([][]\)', '[\1]', 'g'))
-  let start = matchend(a:after, headpat)
-  if start == -1
-    let start = 0
-  endif
 
-  let revbefore = join(reverse(split(a:before, '\zs')), '')
-  let revafter = join(reverse(split(a:after, '\zs')), '')
-  let tailpat = printf('\m\C^\%%[%s]', substitute(escape(revbefore, '~"\.^$*'), '\([][]\)', '[\1]', 'g'))
-  let revend = matchend(revafter, tailpat)
-  if revend == -1
-    let revend = 0
-  endif
-  let end = strlen(a:after) - revend
+if exists('*diff')
+  function! s:diff(before, after) abort
+    return diff(a:before, a:after, {'output': 'indices'})
+  endfunction
+else
+  function! s:diff(before, after) abort
+    let diffoutput = s:calldiff(a:before, a:after)
+    let result = copy(diffoutput)
+    let result = filter(result, {-> v:val =~# '\m^\(\d\+\%(,\d\+\)\?\)\([acd]\)\(\d\+\%(,\d\+\)\?\)'})
+    return map(result, {-> s:diffheader2dict(v:val)})
+  endfunction
+endif
 
-  let commonhead = start == 0 ? '' : a:after[: start-1]
-  let commontail = a:after[end :]
-  let changedmask = printf('\m\C^%s\zs.*\ze%s$',
-                         \ s:escape(commonhead), s:escape(commontail))
-  let changedbefore = matchstrpos(a:before, changedmask)
-  let changedafter = matchstrpos(a:after, changedmask)
-  return [changedbefore, changedafter]
-endfunction "}}}
-function! s:splitchange(linenr, change, lcsindexes) abort "{{{
-  " What I only can do for this func is just praying for my god so far...
-  if empty(a:change[0])
-    return []
-  endif
-  if empty(a:lcsindexes) || strchars(a:change[0]) == len(a:lcsindexes)
-    let head = [0, a:linenr, a:change[1] + 1, 0]
-    let tail = [0, a:linenr, a:change[2], 0]
-    let subdiff = s:Subdiff(head, tail, 'v', [a:change[0]])
-    return [subdiff]
-  endif
 
-  let charlist = split(a:change[0], '\zs')
-  let indexes = range(len(charlist))
-  call filter(indexes, '!count(a:lcsindexes, v:val)')
-
-  let changes = []
-  let columns = []
-  for i in indexes
-    let n = len(columns)
-    if n == 0
-      call add(columns, i)
-    elseif n == 1
-      if columns[-1] + 1 == i
-        call add(columns, i)
-      else
-        call add(columns, columns[-1])
-        call add(changes, columns)
-        let columns = [i]
-      endif
-    else
-      if columns[-1] + 1 == i
-        let columns[-1] = i
-      else
-        call add(changes, columns)
-        let columns = [i]
-      endif
-    endif
-  endfor
-  let n = len(columns)
-  if n == 0
-    " probably not possible
-  elseif n == 1
-    if columns[-1] + 1 == i
-      call add(columns, i)
-    else
-      call add(columns, columns[-1])
-    endif
-  else
-    if columns[-1] + 1 == i
-      let columns[-1] = i
-    endif
-  endif
-  call add(changes, columns)
-  call map(changes, 's:charidx2idx(charlist, v:val)')
-  call map(changes, 's:columns2subdiff(v:val, a:linenr, a:change)')
-  return changes
-endfunction "}}}
-function! s:charidx2idx(charlist, columns) abort "{{{
-  let indexes = [0, 0]
-  if a:columns[0] != 0
-    let indexes[0] = strlen(join(a:charlist[: a:columns[0] - 1], ''))
-  endif
-  if a:columns[1] != 0
-    let indexes[1] = strlen(join(a:charlist[: a:columns[1]], '')) - 1
-  endif
-  return indexes
-endfunction "}}}
-function! s:columns2subdiff(columns, linenr, change) abort "{{{
-  let text = a:change[0][a:columns[0] : a:columns[1]]
-  let head = [0, a:linenr, a:change[1] + a:columns[0] + 1, 0]
-  let tail = [0, a:linenr, a:change[1] + a:columns[1] + 1, 0]
-  return s:Subdiff(head, tail, 'v', [text])
-endfunction "}}}
-function! s:calldiff(before, after) abort "{{{
+function! s:calldiff(before, after) abort
   if s:TEMPBEFORE ==# ''
     let s:TEMPBEFORE = tempname()
     let s:TEMPAFTER = tempname()
@@ -405,83 +234,238 @@ function! s:calldiff(before, after) abort "{{{
   let cmd = printf('diff -b "%s" "%s"', s:TEMPBEFORE, s:TEMPAFTER)
   let diff = split(s:system(cmd), '\r\?\n')
   return diff
-endfunction "}}}
-function! s:expandlinestr(linestr) abort "{{{
-  let linenr = map(split(a:linestr, ','), 'str2nr(v:val)')
-  if len(linenr) == 1
-    let linenr = [linenr[0], linenr[0]]
-  endif
-  return linenr
-endfunction "}}}
-function! s:parsechunk(diffoutput, from, to, i, n) abort "{{{
-  let i = a:i
-  let lines = {}
-  let lines.add = []
-  let lines.delete = []
-  while i < a:n
-    let line = a:diffoutput[i]
-    if !empty(matchstr(line, '\m\C^\d\+\%(,\d\+\)\?[acd]\d\+\%(,\d\+\)\?'))
-      break
-    endif
+endfunction
 
-    " XXX: For performance, check only up to 250 chars.
-    let [addedline, pos, _] = matchstrpos(line, '\m^>\s\zs.\{,250}')
-    if pos != -1
-      call add(lines.add, addedline)
-      let i += 1
-      continue
-    endif
 
-    let [deletedline, pos, _] = matchstrpos(line, '\m^<\s\zs.\{,250}')
-    if pos != -1
-      call add(lines.delete, deletedline)
-      let i += 1
-      continue
-    endif
-
-    let i += 1
+" NOTE: https://gist.github.com/mattn/566ba5fff15f947730f9c149e74f0eda
+function! s:system(cmd) abort
+  let out = ''
+  let job = job_start(a:cmd, {'out_cb': {ch,msg -> [execute('let out .= msg'), out]}, 'out_mode': 'raw'})
+  while job_status(job) ==# 'run'
+    sleep 1m
   endwhile
-  return [lines, i]
-endfunction "}}}
-function! s:parsediff(diffoutput) abort "{{{
-  if a:diffoutput == []
-    return []
-  endif
+  return out
+endfunction
 
-  let parsed = []
-  let n = len(a:diffoutput)
-  let i = 0
-  while i < n
-    let line = a:diffoutput[i]
-    let [whole, from, kind, to, _, _, _, _, _, _] = matchlist(line, '\m\C^\(\d\+\%(,\d\+\)\?\)\([acd]\)\(\d\+\%(,\d\+\)\?\)')
-    let i += 1
-    if empty(whole)
+
+function! s:diffheader2dict(header) abort
+  " Convert '1a2'     -> #{from_idx: 0, from_count: 0, to_idx: 1, to_count, 1}
+  " Convert '1a2,4'   -> #{from_idx: 0, from_count: 0, to_idx: 1, to_count, 3}
+  " Convert '2d1'     -> #{from_idx: 1, from_count: 1, to_idx: 1, to_count, 0}
+  " Convert '2,4d1'   -> #{from_idx: 1, from_count: 3, to_idx: 1, to_count, 0}
+  " Convert '1c1'     -> #{from_idx: 0, from_count: 1, to_idx: 0, to_count, 1}
+  " Convert '1,3c1,2' -> #{from_idx: 0, from_count: 3, to_idx: 0, to_count, 2}
+  let d = {}
+  let [from, kind, to] = matchlist(a:header, '\m\C^\(\d\+\%(,\d\+\)\?\)\([acd]\)\(\d\+\%(,\d\+\)\?\)')[1:3]
+  let [d.from_idx, d.from_count] = s:parse_line_range(kind, from)
+  let [d.to_idx, d.to_count] = s:parse_line_range(kind, to)
+  if kind is# 'd'
+    let d.to_idx += 1
+  elseif kind is# 'a'
+    let d.from_idx += 1
+  endif
+  if kind is# 'a'
+    let d.from_count = 0
+  elseif kind is# 'd'
+    let d.to_count = 0
+  endif
+  return d
+endfunction
+
+
+function! s:parse_line_range(kind, str) abort
+  let [start, end] = matchlist(a:str, '\m\(\d\+\)\%(,\(\d\+\)\)\?')[1:2]
+  let idx = str2nr(start) - 1
+  if end is# ''
+    let l:count = 1
+  else
+    let l:count = str2nr(end) - str2nr(start) + 1
+  endif
+  return [idx, l:count]
+endfunction
+
+
+function! s:parsediff(hunks, before, after, ...) abort
+  let range_before = get(a:000, 0, [0, len(a:before) - 1])
+  let range_after = get(a:000, 1, [0, len(a:after) - 1])
+
+  let diffs = []
+  for hunk in a:hunks
+    if hunk.from_count != 0 && hunk.to_count == 0
+      let startlnum = max([hunk.from_idx, range_before[0]]) + 1
+      let endlnum = min([hunk.from_idx + hunk.from_count, range_before[1] + 1])
+      if startlnum <= endlnum
+        let d = map(range(startlnum, endlnum), 's:Diff(''d'', [v:val])')
+        call extend(diffs, d)
+      endif
+    elseif hunk.from_count == 0 && hunk.to_count != 0
+      let startlnum = max([hunk.to_idx, range_after[0]]) + 1
+      let endlnum = min([hunk.to_idx + hunk.to_count, range_after[1] + 1])
+      if startlnum <= endlnum
+        let d = map(range(startlnum, endlnum), 's:Diff(''a'', [v:val])')
+        call extend(diffs, d)
+      endif
+    elseif hunk.from_count != 0 && hunk.to_count != 0
+      if hunk.from_count == hunk.to_count
+        " Numbers of lines to delete and add are same
+        " There may be one-by-one correspondence
+        call s:add_changes(diffs, a:before, a:after, hunk.from_idx, hunk.to_idx, hunk.from_count, range_before, range_after)
+      else
+        " Numbers of lines to delete and add are different
+        let corr = s:search_correspondence(a:before, a:after, hunk)
+        let n_del_1 = max([(corr[0] - hunk.from_idx) - (corr[1] - hunk.to_idx), 0])
+        let n_add_1 = max([(corr[1] - hunk.to_idx) - (corr[0] - hunk.from_idx), 0])
+        let n_change = min([hunk.from_idx + hunk.from_count - corr[0], hunk.to_idx + hunk.to_count - corr[1]])
+        let n_del_2 = max([hunk.from_count - n_del_1 - n_change, 0])
+        let n_add_2 = max([hunk.to_count - n_add_1 - n_change, 0])
+
+        let startlnum = max([hunk.from_idx, range_before[0]]) + 1
+        let endlnum = min([hunk.from_idx + n_del_1, range_before[1] + 1])
+        if startlnum <= endlnum
+          let d = map(range(startlnum, endlnum), 's:Diff(''d'', [v:val])')
+          call extend(diffs, d)
+        endif
+
+        let startlnum = max([hunk.to_idx, range_after[0]]) + 1
+        let endlnum = min([hunk.to_idx + n_add_1, range_after[1] + 1])
+        if startlnum <= endlnum
+          let d = map(range(startlnum, endlnum), 's:Diff(''a'', [v:val])')
+          call extend(diffs, d)
+        endif
+
+        call s:add_changes(diffs, a:before, a:after, corr[0], corr[1], n_change, range_before, range_after)
+
+        let startlnum = max([hunk.from_idx + n_del_1 + n_change, range_before[0]]) + 1
+        let endlnum = min([hunk.from_idx + n_del_1 + n_change + n_del_2, range_before[1] + 1])
+        if startlnum <= endlnum
+          let d = map(range(startlnum, endlnum), 's:Diff(''d'', [v:val])')
+          call extend(diffs, d)
+        endif
+
+        let startlnum = max([hunk.to_idx + n_add_1 + n_change, range_after[0]]) + 1
+        let endlnum = min([hunk.to_idx + n_add_1 + n_change + n_add_2, range_after[1] + 1])
+        if startlnum <= endlnum
+          let d = map(range(startlnum, endlnum), 's:Diff(''a'', [v:val])')
+          call extend(diffs, d)
+        endif
+      endif
+    endif
+  endfor
+  return diffs
+endfunction
+
+
+function! s:add_changes(diffs, before, after, from_idx, to_idx, n, range_before, range_after) abort
+  let start = max([0, min([a:range_before[0] - a:from_idx, a:range_after[0] - a:to_idx])])
+  let end = min([a:n - 1, max([a:range_before[1] - a:from_idx, a:range_after[1] - a:to_idx])])
+  for i in range(start, end)
+    let idx_before = a:from_idx + i
+    let idx_after = a:to_idx + i
+    if (idx_before < a:range_before[0] || a:range_before[1] < idx_before)
+    \ && (idx_after < a:range_after[0] || a:range_after[1] < idx_after)
       continue
     endif
+    let lnum_before = idx_before + 1
+    let lnum_after = idx_after + 1
+    let line_before = a:before[idx_before]
+    let line_after = a:after[idx_after]
+    let changelist = highlightedundo#chardiff#diff(line_before, line_after)
+    for change in changelist
+      let [del_col, del_count] = change[0]
+      let [add_col, add_count] = change[1]
+      if del_count != 0 && add_count != 0
+        let d = s:Diff('c', [lnum_before, del_col, del_count], [lnum_after, add_col, add_count])
+        call add(a:diffs, d)
+      elseif del_count != 0
+        if a:range_before[0] <= idx_before && idx_before <= a:range_before[1]
+          let d = s:Diff('d', [lnum_before, del_col, del_count])
+          call add(a:diffs, d)
+        endif
+      elseif add_count != 0
+        if a:range_after[0] <= idx_after && idx_after <= a:range_after[1]
+          let d = s:Diff('a', [lnum_after, add_col, add_count])
+          call add(a:diffs, d)
+        endif
+      endif
+    endfor
+  endfor
+endfunction
 
-    let fromlinenr = s:expandlinestr(from)
-    let tolinenr = s:expandlinestr(to)
-    let [lines, i] = s:parsechunk(a:diffoutput, from, to, i, n)
-    let diff = s:Diff(kind, fromlinenr, tolinenr, lines)
-    call add(parsed, diff)
-  endwhile
-  return parsed
-endfunction "}}}
-function! s:getdiff(count, command, countercommand) abort "{{{
-  let view = winsaveview()
-  let countstr = a:count == 1 ? '' : string(a:count)
 
-  let before = getline(1, '$')
-  execute 'silent noautocmd normal! ' . countstr . a:command
-  let after = getline(1, '$')
-
-  if a:countercommand !=# ''
-    execute 'silent noautocmd normal! ' . countstr . a:countercommand
+function! s:search_correspondence(before, after, hunk) abort
+  let acceptable_shift = 5
+  if len(a:before) <= len(a:after)
+    let needle = a:before[a:hunk.from_idx]
+    let stuck = a:after
+    let n = min([a:hunk.to_count, acceptable_shift]) - 1
+    let candidates = uniq(sort(range(a:hunk.to_idx, a:hunk.to_idx + n) +
+                   \ [a:hunk.to_idx + a:hunk.to_count - a:hunk.from_count]))
+  else
+    let needle = a:after[a:hunk.to_idx]
+    let stuck = a:before
+    let n = min([a:hunk.from_count, acceptable_shift]) - 1
+    let candidates = uniq(sort(range(a:hunk.from_idx, a:hunk.from_idx + n) +
+                  \ [a:hunk.from_idx + a:hunk.from_count - a:hunk.to_count]))
   endif
-  call winrestview(view)
-  return s:calldiff(before, after)
-endfunction "}}}
-function! s:waitforinput(duration) abort "{{{
+  let maxlnum = len(stuck)
+  call filter(candidates, '0 <= v:val && v:val < maxlnum')
+  let p = -1
+  let corr_idx = -1
+  for idx in candidates
+    let pp = highlightedundo#chardiff#similarity(needle, stuck[idx])
+    if pp > p
+      let p = pp
+      let corr_idx = idx
+    endif
+  endfor
+  if len(a:before) <= len(a:after)
+    let corr_idx = corr_idx > 0.5 ? corr_idx : a:hunk.to_idx
+    let correspondence = [a:hunk.from_idx, corr_idx]
+  else
+    let corr_idx = corr_idx > 0.5 ? corr_idx : a:hunk.from_idx
+    let correspondence = [corr_idx, a:hunk.to_idx]
+  endif
+  return correspondence
+endfunction
+
+
+let s:highlights = []
+function! s:quench_highlight() abort
+  for h in s:highlights
+    call h.quench()
+  endfor
+  call filter(s:highlights, 0)
+endfunction
+
+
+function! s:blink(difflist, duration) abort
+  if a:duration <= 0
+    return
+  endif
+  if g:highlightedundo#highlight_mode < 2
+    return
+  endif
+
+  let h = highlightedundo#highlight#new()
+  for diff in a:difflist
+    if diff.kind is# 'd'
+      call h.add('HighlightedundoDelete', diff.delete)
+    elseif diff.kind is# 'c'
+      call h.add('HighlightedundoChange', diff.delete)
+    endif
+  endfor
+  call h.show()
+  redraw
+
+  try
+    call s:waitforinput(a:duration)
+  finally
+    call h.quench()
+  endtry
+endfunction
+
+
+function! s:waitforinput(duration) abort
   let clock = highlightedundo#clock#new()
   let c = 0
   call clock.start()
@@ -492,34 +476,10 @@ function! s:waitforinput(duration) abort "{{{
     endif
   endwhile
   call clock.stop()
-endfunction "}}}
-function! s:blink(difflist, duration) abort "{{{
-  if a:duration <= 0
-    return
-  endif
-  if g:highlightedundo#highlight_mode < 2
-    return
-  endif
+endfunction
 
-  let h = highlightedundo#highlight#new()
-  for diff in a:difflist
-    for subdiff in diff.delete
-      if filter(copy(subdiff.lines), '!empty(v:val)') == []
-        continue
-      endif
-      call h.add(subdiff.region)
-    endfor
-  endfor
-  call h.show('HighlightedundoDelete')
-  redraw
 
-  try
-    call s:waitforinput(a:duration)
-  finally
-    call h.quench()
-  endtry
-endfunction "}}}
-function! s:glow(difflist, duration) abort "{{{
+function! s:glow(difflist, duration) abort
   if a:duration <= 0
     return
   endif
@@ -528,96 +488,26 @@ function! s:glow(difflist, duration) abort "{{{
   endif
 
   let h = highlightedundo#highlight#new()
-  let higroup = g:highlightedundo#highlight_mode == 1 ? 'HighlightedundoChange' : 'HighlightedundoAdd'
   for diff in a:difflist
-    for subdiff in diff.add
-      if filter(copy(subdiff.lines), '!empty(v:val)') == []
-        continue
-      endif
-      call h.add(subdiff.region)
-    endfor
-  endfor
-  call h.show(higroup)
-  call h.quench_timer(a:duration)
-endfunction "}}}
-
-" solving Longest Common Subsequence problem
-function! s:lcsmap(n) abort "{{{
-  let d = []
-  for i in range(a:n)
-    let d += [repeat([0], a:n)]
-  endfor
-  return d
-endfunction
-let s:dmax = 81
-let s:lcsmap = s:lcsmap(s:dmax)
-"}}}
-function! s:longestcommonsubsequence(a, b) abort "{{{
-  let a = split(a:a, '\zs')
-  let b = split(a:b, '\zs')
-  let na = len(a)
-  let nb = len(b)
-  if na == 0 || nb == 0
-    return [[], []]
-  endif
-  if na == 1
-    return s:lcs_for_a_char(a:a, a:b)
-  endif
-  if nb == 1
-    return s:lcs_for_a_char(a:b, a:a)
-  endif
-
-  let nmax = max([na, nb])
-  if nmax >= s:dmax
-    let s:dmax = nmax + 1
-    let s:lcsmap = s:lcsmap(s:dmax)
-  endif
-  let d = copy(s:lcsmap)
-  for i in range(1, na)
-    for j in range(1, nb)
-      if a[i - 1] ==# b[j - 1]
-        let d[i][j] = d[i - 1][j - 1] + 1
-      else
-        let d[i][j] = max([d[i - 1][j], d[i][j - 1]])
-      endif
-    endfor
-  endfor
-  return s:backtrack(d, a, b, na, nb)
-endfunction "}}}
-function! s:lcs_for_a_char(a, b) abort "{{{
-  let commonindex = stridx(a:b, a:a)
-  if commonindex == -1
-    let aindexes = []
-    let bindexes = []
-  else
-    let aindexes = [0]
-    let bindexes = [commonindex]
-  endif
-  return [aindexes, bindexes]
-endfunction "}}}
-function! s:backtrack(d, a, b, na, nb) abort "{{{
-  let aindexes = []
-  let bindexes = []
-  let i = a:na
-  let j = a:nb
-  while i != 0 && j != 0
-    if a:a[i - 1] ==# a:b[j - 1]
-      let i -= 1
-      let j -= 1
-      call add(aindexes, i)
-      call add(bindexes, j)
-    elseif a:d[i - 1][j] >= a:d[i][j - 1]
-      let i -= 1
-    else
-      let j -= 1
+    if diff.kind is# 'a'
+      call h.add('HighlightedundoAdd', diff.add)
+    elseif diff.kind is# 'c'
+      call h.add('HighlightedundoChange', diff.add)
     endif
-  endwhile
-  return [reverse(aindexes), reverse(bindexes)]
-endfunction "}}}
+  endfor
+  call h.show()
+  call h.quench_timer(a:duration)
+  call add(s:highlights, h)
+endfunction
+
+
+" for debug
+function! highlightedundo#dumptree(filename) abort
+  call writefile([string(undotree())], a:filename)
+endfunction
+
 
 let &cpoptions = s:save_cpo
 unlet s:save_cpo
 
-" vim:set foldmethod=marker:
-" vim:set commentstring="%s:
 " vim:set ts=2 sts=2 sw=2:
