@@ -74,6 +74,8 @@ function! s:highlight._quench() abort
   if winid == self.winid
     call s:matchdelete_all(self.id)
     let succeeded = 1
+    " This :redraw suppresses flickering when highlights are deleted
+    redraw
   else
     if getcmdwintype() !=# '' || s:is_in_popup_terminal_window()
       " NOTE: cannot move out from commandline-window
@@ -87,6 +89,8 @@ function! s:highlight._quench() abort
       noautocmd let reached = win_gotoid(self.winid)
       if reached
         call s:matchdelete_all(self.id)
+        " This :redraw suppresses flickering when highlights are deleted
+        redraw
       else
         call filter(self.id, 0)
       endif
