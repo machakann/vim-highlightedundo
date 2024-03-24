@@ -193,9 +193,9 @@ function! s:chunk_match(A, B, chunklen, i0, j0, imax, jmax) abort
     let chunkexpr = s:to_expr(chunk)
     let jj = match(B_cutoff, chunkexpr, a:j0)
     if jj >= 0
-      let kk = s:count_coincidence(a:A, a:B, ii, jj, a:imax, a:jmax)
-      if kk > k
-        let [i, j, k] = [ii, jj, kk]
+      let kk = s:count_coincidence(a:A, a:B, ii + a:chunklen, jj + a:chunklen, a:imax, a:jmax)
+      if kk + a:chunklen > k
+        let [i, j, k] = [ii, jj, kk + a:chunklen]
       endif
       let slip -= 1
     endif

@@ -209,9 +209,9 @@ def ChunkMatch(A: string, B: string, chunklen: number, i0: number, j0: number,
     var chunkexpr = ToExpr(chunk)
     var jj = Charmatch(B_cutoff, chunkexpr, j0)
     if jj >= 0
-      var kk = CountCoincidence(A, B, ii, jj, imax, jmax)
-      if kk > k
-        [i, j, k] = [ii, jj, kk]
+      var kk = CountCoincidence(A, B, ii + chunklen, jj + chunklen, imax, jmax)
+      if kk + chunklen > k
+        [i, j, k] = [ii, jj, kk + chunklen]
       endif
       slip -= 1
     endif
