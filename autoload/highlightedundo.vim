@@ -7,6 +7,8 @@ let g:highlightedundo#highlight_duration_add = get(g:, 'highlightedundo#highligh
 let g:highlightedundo#highlight_extra_lines = get(g:, 'highlighbarundo#highlight_extra_lines', &lines)
 let g:highlightedundo#debounce = get(g:, 'highlightedundo#debounce', 60)
 
+let s:FALSE = 0
+let s:TRUE = 1
 let s:TEMPBEFORE = ''
 let s:TEMPAFTER = ''
 let s:GUI_RUNNING = has('gui_running')
@@ -446,17 +448,23 @@ function! s:blink(difflist, duration) abort
     return
   endif
 
+  let isempty = s:TRUE
   let h = highlightedundo#highlight#new()
   for diff in a:difflist
     if diff.kind is# 'd'
+      let isempty = s:FALSE
       call h.add('HighlightedundoDelete', diff.delete)
     elseif diff.kind is# 'c'
+      let isempty = s:FALSE
       call h.add('HighlightedundoChange', diff.delete)
     endif
   endfor
+  if isempty
+    return
+  endif
+
   call h.show()
   redraw
-
   try
     call s:waitforinput(a:duration)
   finally
