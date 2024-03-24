@@ -6,32 +6,31 @@ function! s:Diff(before, after, ...) abort
     return []
   endif
   let limit = get(a:000, 0, 255)
-  if a:before[:limit] ==# a:after[:limit]
-    " There is a difference after `limit` bytes.
-    return [[[1, strlen(a:before)], [1, strlen(a:after)]]]
-  endif
   let beforelen = strlen(a:before)
   let afterlen = strlen(a:after)
   let chunklen = 3
-  if min([beforelen, afterlen]) <= chunklen
+  if beforelen <= chunklen || afterlen <= chunklen
     return s:compare_short(a:before, a:after)
+  elseif beforelen <= limit && afterlen <= limit
+    return s:compare_medium(a:before, a:after, chunklen)
   endif
-  return s:compare(a:before, a:after, limit, chunklen)
+  return s:compare_long(a:before, a:after, chunklen, limit)
 endfunction
 
 
-function! s:Similarity(before, after) abort
+function! s:Similarity(before, after, ...) abort
   if a:before ==# a:after
     return 1.0
   endif
-  let beforelen = strlen(a:before)
-  let afterlen = strlen(a:after)
+  let limit = get(a:000, 0, 255)
+  let imax = min([strlen(a:before), limit])
+  let jmax = min([strlen(a:after), limit])
   let chunklen = 3
-  let forward_match_p = s:count_coincidence(a:before, a:after, 0, 0)
+  let forward_match_p = s:count_coincidence(a:before, a:after, 0, 0, imax, jmax)
   let i = forward_match_p
   let j = forward_match_p
-  let [_, _, chunk_match_p] = s:chunk_match(a:before, a:after, chunklen, i, j)
-  return 1.0*(forward_match_p + chunk_match_p)/min([beforelen, afterlen])
+  let [_, _, chunk_match_p] = s:chunk_match(a:before, a:after, chunklen, i, j, imax, jmax)
+  return 1.0*(forward_match_p + chunk_match_p)/min([imax, jmax])
 endfunction
 
 
@@ -68,67 +67,81 @@ function! s:compare_short_impl(short, long) abort
 endfunction
 
 
-function! s:compare(before, after, limit, chunklen) abort
-  let before = a:before[: a:limit]
-  let after = a:after[: a:limit]
-  " NOTE: beforelen != strchars(a:before) and
-  "       afterlen != strchars(a:after) in this func
-  let beforelen = strlen(before)
-  let afterlen = strlen(after)
-  let loffset = s:count_coincidence(before, after, 0, 0)
+function! s:compare_medium(before, after, chunklen) abort
+  let beforelen = strlen(a:before)
+  let afterlen = strlen(a:after)
+  let loffset = s:count_coincidence(a:before, a:after, 0, 0, beforelen, afterlen)
   let i = loffset
   let j = loffset
   if i == beforelen
     " abc, abcvvv
-    let original_after_len = strlen(a:after)
-    return [[[loffset + 1, 0], [loffset + 1, original_after_len - loffset]]]
+    return [[[loffset + 1, 0], [loffset + 1, afterlen - loffset]]]
   elseif j == afterlen
     " abcvvv, abc
-    let original_before_len = strlen(a:before)
-    return [[[loffset + 1, original_before_len - loffset], [loffset + 1, 0]]]
+    return [[[loffset + 1, beforelen - loffset], [loffset + 1, 0]]]
   endif
 
-  let roffset = s:count_coincidence(before, after, 0, 0, 1)
+  let roffset = s:count_coincidence(a:before, a:after, 0, 0, beforelen, afterlen, 1)
   let roffset = min([roffset, beforelen - loffset, afterlen - loffset])
   let imax = beforelen - roffset
   let jmax = afterlen - roffset
-  let difflist = []
+  let changelist = []
   if i == imax
     " abcdef, abcvvvdef
-    call add(difflist, [[loffset + 1, 0], [loffset + 1, afterlen - loffset - roffset]])
+    call add(changelist, [[loffset + 1, 0], [loffset + 1, afterlen - loffset - roffset]])
   elseif j == jmax
     " abcvvvdef, abcdef
-    call add(difflist, [[loffset + 1, beforelen - loffset - roffset], [loffset + 1, 0]])
+    call add(changelist, [[loffset + 1, beforelen - loffset - roffset], [loffset + 1, 0]])
   else
-    let d = s:compare_impl(before[:imax - 1], after[:jmax - 1], a:chunklen, i, j, imax, jmax)
-    call extend(difflist, d)
+    let before_cutoff = a:before[: imax - 1]
+    let after_cutoff = a:after[: jmax - 1]
+    let d = s:compare_impl(before_cutoff, after_cutoff, a:chunklen, i, j, imax, jmax)
+    call extend(changelist, d)
+  endif
+  return changelist
+endfunction
+
+
+function! s:compare_long(before, after, chunklen, limit) abort
+  let beforelen = strlen(a:before)
+  let afterlen = strlen(a:after)
+  let imax = min([beforelen, a:limit])
+  let jmax = min([afterlen, a:limit])
+  let before_cutoff = a:before[: imax - 1]
+  let after_cutoff = a:after[: jmax - 1]
+  if before_cutoff ==# after_cutoff
+    " There is a difference after `limit` bytes.
+    return [[[1, beforelen], [1, afterlen]]]
   endif
 
-  let before_rest = a:before[a:limit + 1 :]
-  let after_rest = a:after[a:limit + 1 :]
-  if before_rest ==# '' && after_rest !=# ''
-    call add(difflist, [[a:limit + 2, 0], [a:limit + 2, strlen(after_rest)]])
-  elseif before_rest !=# '' && after_rest ==# ''
-    call add(difflist, [[a:limit + 2, strlen(before_rest)], [a:limit + 2, 0]])
-  elseif before_rest !=# '' && after_rest !=# ''
-    call add(difflist, [[a:limit + 2, strlen(before_rest)], [a:limit + 2, strlen(after_rest)]])
+  let loffset = s:count_coincidence(before_cutoff, after_cutoff, 0, 0, imax, jmax)
+  let i = loffset
+  let j = loffset
+  if i == beforelen
+    " abc, abcvvv...
+    return [[[loffset + 1, 0], [loffset + 1, afterlen - loffset]]]
+  elseif j == afterlen
+    " abcvvv..., abc
+    return [[[loffset + 1, beforelen - loffset], [loffset + 1, 0]]]
   endif
-  return difflist
+  return s:compare_impl(a:before, a:after, a:chunklen, i, j, imax, jmax)
 endfunction
 
 
 function! s:compare_impl(before, after, chunklen, i0, j0, imax, jmax) abort
   let i = a:i0
   let j = a:j0
+  let beforelen = strlen(a:before)
+  let afterlen = strlen(a:after)
   let loop = 0
   let loopmax = 100
   let result = []
   while loop < loopmax
     let loop += 1
-    let [ii, jj, k] = s:chunk_match(a:before, a:after, a:chunklen, i, j)
+    let [ii, jj, k] = s:chunk_match(a:before, a:after, a:chunklen, i, j, a:imax, a:jmax)
     if jj < 0
       " No match
-      call add(result, [[i + 1, a:imax - i], [j + 1, a:jmax - j]])
+      call add(result, [[i + 1, beforelen - i], [j + 1, afterlen - j]])
       break
     elseif jj == j
       if ii > i
@@ -144,6 +157,10 @@ function! s:compare_impl(before, after, chunklen, i0, j0, imax, jmax) abort
     let i = ii + k
     let j = jj + k
     if i > a:imax - a:chunklen || j > a:jmax - a:chunklen
+      if a:before[ii :] ==# a:after[jj :]
+        break
+      endif
+
       let del = [i + 1, max([a:imax - i, 0])]
       let add = [j + 1, max([a:jmax - j, 0])]
       if add[1] > 0 || del[1] > 0
@@ -156,25 +173,27 @@ function! s:compare_impl(before, after, chunklen, i0, j0, imax, jmax) abort
 endfunction
 
 
-function! s:chunk_match(A, B, chunklen, i0, j0) abort
-  let Alen = strlen(a:A)
-  let Blen = strlen(a:B)
-  let i = Alen - a:chunklen - 1
+function! s:chunk_match(A, B, chunklen, i0, j0, imax, jmax) abort
+  let i = a:imax - a:chunklen
   let j = -1
-  if Alen - a:i0 < a:chunklen || Blen - a:j0 < a:chunklen
+  if a:imax - a:i0 < a:chunklen || a:jmax - a:j0 < a:chunklen
     return [i, j, 0]
   endif
 
   let k = 0
   let slip = a:chunklen*3
-  for ii in range(a:i0, Alen - a:chunklen)
+  let B_cutoff = a:B[: a:jmax]
+  for ii in range(a:i0, a:imax - a:chunklen)
+    if ii > i + k
+      break
+    endif
     let start = ii
     let end = ii + a:chunklen - 1
     let chunk = a:A[start:end]
     let chunkexpr = s:to_expr(chunk)
-    let jj = match(a:B, chunkexpr, a:j0)
+    let jj = match(B_cutoff, chunkexpr, a:j0)
     if jj >= 0
-      let kk = s:count_coincidence(a:A, a:B, ii, jj)
+      let kk = s:count_coincidence(a:A, a:B, ii, jj, a:imax, a:jmax)
       if kk > k
         let [i, j, k] = [ii, jj, kk]
       endif
@@ -193,11 +212,11 @@ function! s:to_expr(str) abort
 endfunction
 
 
-function! s:count_coincidence(A, B, i, j, ...) abort
+function! s:count_coincidence(A, B, i, j, imax, jmax, ...) abort
   let rev = get(a:000, 0, 0)
   let Alen = strlen(a:A)
   let Blen = strlen(a:B)
-  let n = min([Alen - a:i, Blen - a:j])
+  let n = min([a:imax - a:i, a:jmax - a:j])
   if n <= 0
     return 0
   endif

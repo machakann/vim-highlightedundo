@@ -110,20 +110,41 @@ function! s:test_chardiff(chardiff) abort
   call g:assert.equals(a:chardiff('foobarbaz(qux), foobarbaz(corge)', 'qux, foobarbaz(corge)'),
   \ [[[1, 10], [1, 0]], [[14, 1], [4, 0]]], '#29')
 
-  call g:assert.equals(a:chardiff(repeat('a', 256), repeat('a', 256) . 'b'),
-  \ [[[1, 256], [1, 257]]], '#30')
+  call g:assert.equals(a:chardiff(repeat('a', 255), repeat('a', 255) . 'b'),
+  \ [[[1, 255], [1, 256]]], '#30')
 
-  call g:assert.equals(a:chardiff(repeat('a', 257), 'bb'),
-  \ [[[1, 257], [1, 2]]], '#31')
+  call g:assert.equals(a:chardiff(repeat('a', 255) . 'b', repeat('a', 255)),
+  \ [[[1, 256], [1, 255]]], '#31')
 
-  call g:assert.equals(a:chardiff(repeat('a', 256), repeat('b', 256) . 'c'),
-  \ [[[1, 256], [1, 256]], [[257, 0], [257, 1]]], '#32')
+  call g:assert.equals(a:chardiff(repeat('a', 255) . 'b', repeat('a', 255) . 'c'),
+  \ [[[1, 256], [1, 256]]], '#32')
 
-  call g:assert.equals(a:chardiff(repeat('a', 256) . 'c', repeat('b', 256)),
-  \ [[[1, 256], [1, 256]], [[257, 1], [257, 0]]], '#33')
+  call g:assert.equals(a:chardiff(repeat('a', 256), 'bb'),
+  \ [[[1, 256], [1, 2]]], '#33')
 
-  call g:assert.equals(a:chardiff(repeat('a', 256) . 'c', repeat('b', 256) . 'd'),
-  \ [[[1, 256], [1, 256]], [[257, 1], [257, 1]]], '#34')
+  call g:assert.equals(a:chardiff('bb', repeat('a', 256)),
+  \ [[[1, 2], [1, 256]]], '#34')
+
+  call g:assert.equals(a:chardiff(repeat('a', 255), repeat('b', 255) . 'c'),
+  \ [[[1, 255], [1, 256]]], '#35')
+
+  call g:assert.equals(a:chardiff(repeat('a', 255) . 'c', repeat('b', 255)),
+  \ [[[1, 256], [1, 255]]], '#36')
+
+  call g:assert.equals(a:chardiff(repeat('a', 255) . 'c', repeat('b', 255) . 'd'),
+  \ [[[1, 256], [1, 256]]], '#37')
+
+  call g:assert.equals(a:chardiff('b' . repeat('a', 255), repeat('a', 255)),
+  \ [[[1, 1], [1, 0]]], '#38')
+
+  call g:assert.equals(a:chardiff(repeat('a', 255), 'c' . repeat('a', 255)),
+  \ [[[1, 0], [1, 1]]], '#39')
+
+  call g:assert.equals(a:chardiff('b' . repeat('a', 255), 'c' . repeat('a', 255)),
+  \ [[[1, 1], [1, 1]]], '#40')
+
+  call g:assert.equals(a:chardiff('abc' . repeat('u', 249) . 'abcdef', 'abc' . repeat('v', 248) . 'abcdef'),
+  \ [[[4, 249], [4, 248]]], '#41')
 endfunction
 
 

@@ -5,10 +5,6 @@ export def Diff(before: string, after: string, limit=255): list<list<list<number
   if before ==# after
     return []
   endif
-  if before[: limit] ==# after[: limit]
-    # There is a difference after `limit` bytes.
-    return [[[1, strlen(before)], [1, strlen(after)]]]
-  endif
   var changelist = DiffImpl(before, after, limit)
   # Convert charidx to byteidx
   map(changelist, (k, v): list<list<number>> => [Byteidx(v[0], before), Byteidx(v[1], after)])
@@ -32,25 +28,27 @@ def DiffImpl(before: string, after: string, limit: number): list<list<list<numbe
     return [[[1, beforelen], [1, afterlen]]]
   endif
   const chunklen = 3
-  if min([beforelen, afterlen]) <= chunklen
+  if beforelen <= chunklen || afterlen <= chunklen
     return CompareShort(before, after)
+  elseif beforelen <= limit && afterlen <= limit
+    return CompareMedium(before, after, chunklen)
   endif
-  return Compare(before, after, limit, chunklen)
+  return CompareLong(before, after, chunklen, limit)
 enddef
 
 
-export def Similarity(before: string, after: string): float
+export def Similarity(before: string, after: string, limit=255): float
   if before ==# after
     return 1.0
   endif
-  const beforelen = strchars(before)
-  const afterlen = strchars(after)
+  const imax = min([strchars(before), limit])
+  const jmax = min([strchars(after), limit])
   const chunklen = 3
-  const forward_match_p = CountCoincidence(before, after, 0, 0)
+  const forward_match_p = CountCoincidence(before, after, 0, 0, imax, jmax)
   const i = forward_match_p
   const j = forward_match_p
-  const [_, _, chunk_match_p] = ChunkMatch(before, after, chunklen, i, j)
-  return 1.0 * (forward_match_p + chunk_match_p) / min([beforelen, afterlen])
+  const [_, _, chunk_match_p] = ChunkMatch(before, after, chunklen, i, j, imax, jmax)
+  return 1.0 * (forward_match_p + chunk_match_p) / min([imax, jmax])
 enddef
 
 
@@ -87,27 +85,20 @@ def CompareShortImpl(short: string, long: string): list<list<list<number>>>
 enddef
 
 
-def Compare(before_orig: string, after_orig: string, limit: number,
-            chunklen: number): list<list<list<number>>>
-  var before = before_orig[: limit]
-  var after = after_orig[: limit]
-  # NOTE: beforelen != strchars(before_orig) and
-  #       afterlen != strchars(after_orig) in this func
+def CompareMedium(before: string, after: string, chunklen: number): list<list<list<number>>>
   const beforelen = strchars(before)
   const afterlen = strchars(after)
-  const loffset = CountCoincidence(before, after, 0, 0)
+  const loffset = CountCoincidence(before, after, 0, 0, beforelen, afterlen)
   const i = loffset
   const j = loffset
   if i == beforelen
-    const original_after_len = strchars(after_orig)
-    return [[[loffset + 1, 0], [loffset + 1, original_after_len - loffset]]]
+    return [[[loffset + 1, 0], [loffset + 1, afterlen - loffset]]]
   elseif j == afterlen
-    const original_before_len = strchars(before_orig)
-    return [[[loffset + 1, original_before_len - loffset], [loffset + 1, 0]]]
+    return [[[loffset + 1, beforelen - loffset], [loffset + 1, 0]]]
   endif
 
   const roffset = min([
-    CountCoincidence(reverse(before), reverse(after), 0, 0),
+    CountCoincidence(reverse(before), reverse(after), 0, 0, beforelen, afterlen),
     beforelen - loffset,
     afterlen - loffset,
   ])
@@ -119,20 +110,39 @@ def Compare(before_orig: string, after_orig: string, limit: number,
   elseif j == jmax
     add(changelist, [[loffset + 1, beforelen - loffset - roffset], [loffset + 1, 0]])
   else
-    const d = CompareImpl(before[: imax - 1], after[: jmax - 1], chunklen, i, j, imax, jmax)
+    const before_cutoff = before[: imax - 1]
+    const after_cutoff = after[: jmax - 1]
+    const d = CompareImpl(before_cutoff, after_cutoff, chunklen, i, j, imax, jmax)
     extend(changelist, d)
   endif
-
-  const before_rest = before_orig[limit + 1 :]
-  const after_rest = after_orig[limit + 1 :]
-  if before_rest ==# '' && after_rest !=# ''
-    add(changelist, [[limit + 2, 0], [limit + 2, strchars(after_rest)]])
-  elseif before_rest !=# '' && after_rest ==# ''
-    add(changelist, [[limit + 2, strchars(before_rest)], [limit + 2, 0]])
-  elseif before_rest !=# '' && after_rest !=# ''
-    add(changelist, [[limit + 2, strchars(before_rest)], [limit + 2, strchars(after_rest)]])
-  endif
   return changelist
+enddef
+
+
+def CompareLong(before: string, after: string, chunklen: number,
+                limit: number): list<list<list<number>>>
+  const beforelen = strchars(before)
+  const afterlen = strchars(after)
+  const imax = min([beforelen, limit])
+  const jmax = min([afterlen, limit])
+  const before_cutoff = before[: imax - 1]
+  const after_cutoff = after[: jmax - 1]
+  if before_cutoff ==# after_cutoff
+    # There is a difference after `limit` bytes.
+    return [[[1, beforelen], [1, afterlen]]]
+  endif
+
+  const loffset = CountCoincidence(before, after, 0, 0, imax, jmax)
+  const i = loffset
+  const j = loffset
+  if i == beforelen
+    # abc, abcvvv...
+    return [[[loffset + 1, 0], [loffset + 1, afterlen - loffset]]]
+  elseif j == afterlen
+    # abcvvv..., abc
+    return [[[loffset + 1, beforelen - loffset], [loffset + 1, 0]]]
+  endif
+  return CompareImpl(before, after, chunklen, i, j, imax, jmax)
 enddef
 
 
@@ -145,10 +155,10 @@ def CompareImpl(before: string, after: string, chunklen: number, i0: number, j0:
   final result: list<list<list<number>>> = []
   while loop < loopmax
     loop += 1
-    var [ii, jj, k] = ChunkMatch(before, after, chunklen, i, j)
+    var [ii, jj, k] = ChunkMatch(before, after, chunklen, i, j, imax, jmax)
     if jj < 0
       # No match
-      add(result, [[i + 1, imax - i], [j + 1, jmax - j]])
+      add(result, [[i + 1, strchars(before) - i], [j + 1, strchars(after) - j]])
       break
     elseif jj == j
       if ii > i
@@ -164,6 +174,10 @@ def CompareImpl(before: string, after: string, chunklen: number, i0: number, j0:
     i = ii + k
     j = jj + k
     if i > imax - chunklen || j > jmax - chunklen
+      if before[ii :] ==# after[jj :]
+        break
+      endif
+
       var del = [i + 1, max([imax - i, 0])]
       var add = [j + 1, max([jmax - j, 0])]
       if add[1] > 0 || del[1] > 0
@@ -176,23 +190,26 @@ def CompareImpl(before: string, after: string, chunklen: number, i0: number, j0:
 enddef
 
 
-def ChunkMatch(A: string, B: string, chunklen: number, i0: number, j0: number): list<number>
-  const Alen = strchars(A)
-  const Blen = strchars(B)
-  var i = Alen - chunklen - 1
+def ChunkMatch(A: string, B: string, chunklen: number, i0: number, j0: number,
+               imax: number, jmax: number): list<number>
+  var i = imax - chunklen
   var j = -1
-  if Alen - i0 < chunklen || Blen - j0 < chunklen
+  if imax - i0 < chunklen || jmax - j0 < chunklen
     return [i, j, 0]
   endif
 
   var k = 0
   var slip = chunklen * 3
-  for ii in range(i0, Alen - chunklen)
+  const B_cutoff = B[: jmax]
+  for ii in range(i0, imax - chunklen)
+    if ii > i + k
+      break
+    endif
     var chunk = strpart(A, ii, chunklen)
     var chunkexpr = ToExpr(chunk)
-    var jj = Charmatch(B, chunkexpr, j0)
+    var jj = Charmatch(B_cutoff, chunkexpr, j0)
     if jj >= 0
-      var kk = CountCoincidence(A, B, ii, jj)
+      var kk = CountCoincidence(A, B, ii, jj, imax, jmax)
       if kk > k
         [i, j, k] = [ii, jj, kk]
       endif
@@ -216,10 +233,9 @@ def Charmatch(str: string, expr: string, start: number = 0): number
 enddef
 
 
-def CountCoincidence(A: string, B: string, i: number, j: number): number
-  const Alen = strchars(A)
-  const Blen = strchars(B)
-  const n = min([Alen - i, Blen - j])
+def CountCoincidence(A: string, B: string, i: number, j: number,
+                     imax: number, jmax: number): number
+  const n = min([imax - i, jmax - j])
   if n <= 0
     return 0
   endif
