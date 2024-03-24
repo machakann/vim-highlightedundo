@@ -2,7 +2,7 @@
 let s:save_cpo = &cpoptions
 set cpoptions&vim
 
-if v:version > 900
+if exists(':import') && v:version > 900
   import './chardiff/chardiff_vim9.vim' as chardiff
 else
   let s:chardiff = highlightedundo#chardiff#chardiff_legacy#import()
