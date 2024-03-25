@@ -451,13 +451,8 @@ function! s:blink(difflist, duration) abort
   let isempty = s:TRUE
   let h = highlightedundo#highlight#new()
   for diff in a:difflist
-    if diff.kind is# 'd'
-      let isempty = s:FALSE
-      call h.add('HighlightedundoDelete', diff.delete)
-    elseif diff.kind is# 'c'
-      let isempty = s:FALSE
-      call h.add('HighlightedundoChange', diff.delete)
-    endif
+    let isempty = s:FALSE
+    call h.add('HighlightedundoDelete', diff.delete)
   endfor
   if isempty
     return
@@ -496,11 +491,13 @@ function! s:glow(difflist, duration) abort
   endif
 
   let h = highlightedundo#highlight#new()
+  let hi_change = g:highlightedundo#highlight_mode < 2 ?
+                \ 'HighlightedundoChange' : 'HighlightedundoAdd'
   for diff in a:difflist
     if diff.kind is# 'a'
       call h.add('HighlightedundoAdd', diff.add)
     elseif diff.kind is# 'c'
-      call h.add('HighlightedundoChange', diff.add)
+      call h.add(hi_change, diff.add)
     endif
   endfor
   call h.show()
