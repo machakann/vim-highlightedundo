@@ -1,5 +1,5 @@
 *highlightedundo.txt*	アンドゥした場所をわかりやすくする。
-						Last change:20-Mar-2024.
+						Last change:26-Mar-2024.
 
 書いた人   : machakann <https://github.com/machakann>
 ライセンス : NYSL license
@@ -41,6 +41,7 @@ INTRODUCTION				*highlightedundo-introduction*
 
 |g:highlightedundo#highlight_mode| が 1 の時、 |highlightedundo.vim| は
 ハイライトグループ |hl-HighlightedundoChange| を使ってハイライトします。
+これがデフォルトの挙動です。
 
 |g:highlightedundo#highlight_mode| が 2 の時、 |highlightedundo.vim| は
 ハイライトグループ |hl-HighlightedundoDelete| および

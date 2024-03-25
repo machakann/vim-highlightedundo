@@ -1,5 +1,5 @@
 *highlightedundo.txt*	Make the undo region apparent!
-						Last change:20-Mar-2024.
+						Last change:26-Mar-2024.
 
 Author  : machakann <https://github.com/machakann>
 License : NYSL license
@@ -40,6 +40,7 @@ not highlight.
 
 If |g:highlightedundo#highlight_mode| is set as 1, |highlightedundo.vim|
 highlights using the highlight group |hl-HighlightedundoChange|.
+This is the default behavior.
 
 If |g:highlightedundo#highlight_mode| is set as 2, |highlightedundo.vim|
 highlights in two steps using the highlight groups |hl-HighlightedundoDelete|
