@@ -205,7 +205,7 @@ def ChunkMatch(A: string, B: string, chunklen: number, i0: number, j0: number,
     if ii > i + k
       break
     endif
-    var chunk = strpart(A, ii, chunklen)
+    var chunk = strcharpart(A, ii, chunklen)
     var chunkexpr = ToExpr(chunk)
     var jj = Charmatch(B_cutoff, chunkexpr, j0)
     if jj >= 0
