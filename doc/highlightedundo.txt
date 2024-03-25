@@ -49,9 +49,9 @@ and |hl-HighlightedundoAdd|.
 				*g:highlightedundo#highlight_duration_delete*
 				*g:highlightedundo#highlight_duration_add*
 User can optimize the highlighting duration of deleted and added texts by
-|g:highlightedundo#highlight_duration_delete| and
-|g:highlightedundo#highlight_duration_add| respectively. Assign a time in
-millisecond.
+|g:highlightedundo#highlight_duration_delete| (default: 200) and
+|g:highlightedundo#highlight_duration_add| (default: 500), respectively.
+Assign a time in millisecond.
 
 ==============================================================================
 HIGHLIGHT GROUPS			*highlightedundo-highlight-groups*

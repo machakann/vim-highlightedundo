@@ -50,9 +50,9 @@ INTRODUCTION				*highlightedundo-introduction*
 				*g:highlightedundo#highlight_duration_delete*
 				*g:highlightedundo#highlight_duration_add*
 
-|g:highlightedundo#highlight_duration_delete| および
-|g:highlightedundo#highlight_duration_add| を使うことでハイライトの時間を変更
-できます。ミリセカンド単位の数値を設定してください
+|g:highlightedundo#highlight_duration_delete| (デフォルト: 200) および
+|g:highlightedundo#highlight_duration_add| (デフォルト: 500) を使うことでハイ
+ライトの時間を変更できます。ミリセカンド単位の数値を設定してください
 
 ==============================================================================
 HIGHLIGHT GROUPS			*highlightedundo-highlight-groups*
