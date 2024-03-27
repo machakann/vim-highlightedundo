@@ -185,10 +185,10 @@ function! s:undoablecount() abort
       if empty(stack)
         " shouldn't reach here
         let msg = [
-          \   'highlightedundo: cannot find the current undo sequence!'
-          \   'Could you :call highlightedundo#dumptree("~\undotree.txt") and'
-          \   'report the dump file to <https://github.com/machakann/vim-highlightedundo/issues>'
-          \   'if you do not mind? it does not include any buffer text.'
+          \   'highlightedundo: cannot find the current undo sequence!',
+          \   'Could you :call highlightedundo#dumptree("~\undotree.txt") and',
+          \   'report the dump file to <https://github.com/machakann/vim-highlightedundo/issues>',
+          \   'if you do not mind? it does not include any buffer text.',
           \ ]
         echoerr join(msg)
       else
@@ -205,6 +205,11 @@ endfunction
 if exists('*diff')
   function! s:diff(before, after) abort
     return diff(a:before, a:after, {'output': 'indices'})
+  endfunction
+elseif has('nvim-0.6.0')
+  function! s:diff(before, after) abort
+    let result = v:lua.vim.diff(join(a:before, "\n"), join(a:after, "\n"), {'result_type': 'indices'})
+    return map(result, { -> {'from_idx': v:val[0] - 1, 'from_count': v:val[1], 'to_idx': v:val[2] - 1, 'to_count': v:val[3]} })
   endfunction
 else
   function! s:diff(before, after) abort
@@ -239,15 +244,24 @@ function! s:calldiff(before, after) abort
 endfunction
 
 
-" NOTE: https://gist.github.com/mattn/566ba5fff15f947730f9c149e74f0eda
-function! s:system(cmd) abort
-  let out = ''
-  let job = job_start(a:cmd, {'out_cb': {ch,msg -> [execute('let out .= msg'), out]}, 'out_mode': 'raw'})
-  while job_status(job) ==# 'run'
-    sleep 1m
-  endwhile
-  return out
-endfunction
+if has('nvim')
+  function! s:system(cmd) abort
+    let out = []
+    let job = jobstart(a:cmd, {'on_stdout': {_,data -> extend(out, data)}})
+    call jobwait([job])
+    return join(out, "\n")
+  endfunction
+else
+  " NOTE: https://gist.github.com/mattn/566ba5fff15f947730f9c149e74f0eda
+  function! s:system(cmd) abort
+    let out = ''
+    let job = job_start(a:cmd, {'out_cb': {ch,msg -> [execute('let out .= msg'), out]}, 'out_mode': 'raw'})
+    while job_status(job) ==# 'run'
+      sleep 1m
+    endwhile
+    return out
+  endfunction
+endif
 
 
 function! s:diffheader2dict(header) abort
