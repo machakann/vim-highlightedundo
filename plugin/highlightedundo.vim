@@ -6,7 +6,7 @@
 "              Japanese <http://www.kmonos.net/nysl/>
 "              English (Unofficial) <http://www.kmonos.net/nysl/index.en.html>
 
-if !executable('diff')
+if !(exists('*diff') || has('nvim-0.6.0') || executable('diff'))
   echohl WarningMsg
   echomsg 'highlightedundo: "diff" command is necessary but it is not available.'
   echohl NONE
