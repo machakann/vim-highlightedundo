@@ -3,7 +3,9 @@ Make the undo region apparent!
 
 ## Dependency
 
-- Vim 8.1+
+- Vim 8.1+ or Neovim 0.6.0+
+
+If Vim, following features are required.
 - `+reltime`
 - `+float`
 - `+timers`

@@ -1,12 +1,15 @@
 *highlightedundo.txt*	アンドゥした場所をわかりやすくする。
-						Last change:26-Mar-2024.
+						Last change:27-Mar-2024.
 
 書いた人   : machakann <https://github.com/machakann>
 ライセンス : NYSL license
           日本語版 <http://www.kmonos.net/nysl/>
           英語版 (非公式) <http://www.kmonos.net/nysl/index.en.html>
 
-必要要件:	Vim 8.1 かそれ以降の Vim エディタであること
+必要要件:	Vim 8.1 かそれ以降の Vim エディタであること、または Neovim
+		0.6.0 かそれ以降の Neovim エディタであること。
+
+		Vimの場合、次のオプションが有効になっていること。
 		  * |+reltime| オプション
 		  * |+float| オプション
 		  * |+timers| オプション
