@@ -57,7 +57,7 @@ function! s:highlight.quench(...) dict abort
     call self._quench()
   catch /^Vim\%((\a\+)\)\=:E523/
     " NOTE: In case of "textlock"ed!
-    call self.quench_timer(1)
+    call self.quench_timer(100)
   endtry
   call timer_stop(self.timer_id)
   call s:clear_autocmds()
