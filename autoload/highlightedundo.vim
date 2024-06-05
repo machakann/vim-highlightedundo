@@ -360,6 +360,10 @@ endfunction
 function! s:add_changes(diffs, before, after, from_idx, to_idx, n, range_before, range_after) abort
   let start = max([0, min([a:range_before[0] - a:from_idx, a:range_after[0] - a:to_idx])])
   let end = min([a:n - 1, max([a:range_before[1] - a:from_idx, a:range_after[1] - a:to_idx])])
+  if start > end
+    return
+  endif
+
   for i in range(start, end)
     let idx_before = a:from_idx + i
     let idx_after = a:to_idx + i
