@@ -83,7 +83,11 @@ function! s:common(count, command, countercommand) abort
     let range_before = s:highlight_range(g:highlightedundo#highlight_extra_lines)
     call winrestview(view)
   endtry
-  let difflist = s:parsediff(hunks, before, after, range_before, range_after)
+  try
+    let difflist = s:parsediff(hunks, before, after, range_before, range_after)
+  catch
+    let difflist = []
+  endtry
 
   let originalcursor = s:hidecursor()
   try
